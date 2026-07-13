@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo } from 'react';
+import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Mark } from '@/components/Mark';
+import { TripFormModal } from '@/components/TripFormModal';
 import { Card, Chip, Display, Eyebrow, Screen } from '@/components/ui';
 import { WeightRing } from '@/components/WeightRing';
 import { font, useTheme } from '@/theme/tokens';
@@ -25,9 +27,11 @@ const fmtRange = (a: string, b: string) => {
 
 export default function TripsScreen() {
   const t = useTheme();
+  const router = useRouter();
   const gear = useGearStore((s) => s.gear);
   const trips = useGearStore((s) => s.trips);
   const byId = useMemo(() => gearMap(gear), [gear]);
+  const [tripModal, setTripModal] = useState(false);
 
   const featured = trips[0];
   const rest = trips.slice(1);
@@ -58,22 +62,24 @@ export default function TripsScreen() {
       </View>
 
       {featured ? (
-        <FeaturedCard
-          weight={tripWeight(featured, byId)}
-          target={bagTarget(featured)}
-          bags={featured.bags.length}
-          items={itemCount(featured)}
-          name={featured.name}
-          range={fmtRange(featured.startDate, featured.endDate)}
-          breakdown={categoryBreakdown(featured, byId).slice(0, 3)}
-          barColors={barColors}
-        />
+        <Pressable onPress={() => router.push(`/trip/${featured.id}`)}>
+          <FeaturedCard
+            weight={tripWeight(featured, byId)}
+            target={bagTarget(featured)}
+            bags={featured.bags.length}
+            items={itemCount(featured)}
+            name={featured.name}
+            range={fmtRange(featured.startDate, featured.endDate)}
+            breakdown={categoryBreakdown(featured, byId).slice(0, 3)}
+            barColors={barColors}
+          />
+        </Pressable>
       ) : null}
 
       <View style={{ height: 14 }} />
 
       {rest.map((trip) => (
-        <Pressable key={trip.id} style={{ marginBottom: 10 }}>
+        <Pressable key={trip.id} onPress={() => router.push(`/trip/${trip.id}`)} style={{ marginBottom: 10 }}>
           <Card style={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <View
               style={{
@@ -99,7 +105,7 @@ export default function TripsScreen() {
         </Pressable>
       ))}
 
-      <Pressable>
+      <Pressable onPress={() => setTripModal(true)}>
         <View
           style={{
             flexDirection: 'row',
@@ -117,6 +123,12 @@ export default function TripsScreen() {
           <Text style={{ fontFamily: font.bold, color: t.primary, fontSize: 15 }}>New trip</Text>
         </View>
       </Pressable>
+
+      <TripFormModal
+        visible={tripModal}
+        onClose={() => setTripModal(false)}
+        onCreated={(id) => router.push(`/trip/${id}`)}
+      />
     </Screen>
   );
 }

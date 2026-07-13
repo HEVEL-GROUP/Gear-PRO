@@ -42,6 +42,24 @@ export type Trip = {
   assignments: Assignment[];
 };
 
+export const STATUS_LABELS: Record<GearStatus, string> = {
+  reserved: 'Planned',
+  checked_out: 'Packed',
+  returned: 'Returned',
+  needs_repair: 'Needs repair',
+  consumed: 'Consumed',
+  lost: 'Lost',
+};
+
+export const STATUS_ORDER: GearStatus[] = [
+  'reserved',
+  'checked_out',
+  'returned',
+  'needs_repair',
+  'consumed',
+  'lost',
+];
+
 export const CATEGORIES = [
   'Shelter',
   'Sleep',
@@ -138,7 +156,9 @@ type StoreState = {
   removeGear: (id: string) => void;
   addTrip: (trip: Omit<Trip, 'id'>) => string;
   removeTrip: (id: string) => void;
-  setAssignmentStatus: (tripId: string, assignmentId: string, status: GearStatus) => void;
+  addAssignment: (tripId: string, bagId: string, gearId: string, quantity?: number) => void;
+  updateAssignment: (tripId: string, assignmentId: string, patch: Partial<Assignment>) => void;
+  removeAssignment: (tripId: string, assignmentId: string) => void;
   resetSeed: () => void;
 };
 
@@ -158,7 +178,29 @@ export const useGearStore = create<StoreState>()(
         return id;
       },
       removeTrip: (id) => set((s) => ({ trips: s.trips.filter((t) => t.id !== id) })),
-      setAssignmentStatus: (tripId, assignmentId, status) =>
+      addAssignment: (tripId, bagId, gearId, quantity = 1) =>
+        set((s) => ({
+          trips: s.trips.map((t) => {
+            if (t.id !== tripId) return t;
+            const existing = t.assignments.find((a) => a.gearId === gearId && a.bagId === bagId);
+            if (existing) {
+              return {
+                ...t,
+                assignments: t.assignments.map((a) =>
+                  a.id === existing.id ? { ...a, quantity: a.quantity + quantity } : a,
+                ),
+              };
+            }
+            return {
+              ...t,
+              assignments: [
+                ...t.assignments,
+                { id: uid(), gearId, bagId, quantity, status: 'reserved' as GearStatus },
+              ],
+            };
+          }),
+        })),
+      updateAssignment: (tripId, assignmentId, patch) =>
         set((s) => ({
           trips: s.trips.map((t) =>
             t.id !== tripId
@@ -166,9 +208,17 @@ export const useGearStore = create<StoreState>()(
               : {
                   ...t,
                   assignments: t.assignments.map((a) =>
-                    a.id === assignmentId ? { ...a, status } : a,
+                    a.id === assignmentId ? { ...a, ...patch } : a,
                   ),
                 },
+          ),
+        })),
+      removeAssignment: (tripId, assignmentId) =>
+        set((s) => ({
+          trips: s.trips.map((t) =>
+            t.id !== tripId
+              ? t
+              : { ...t, assignments: t.assignments.filter((a) => a.id !== assignmentId) },
           ),
         })),
       resetSeed: () => set({ gear: seedGear, trips: seedTrips(), categories: CATEGORIES }),
