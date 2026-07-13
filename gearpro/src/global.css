@@ -1,0 +1,23 @@
+:root {
+  --font-display: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Caprasimo', Georgia, serif;
+  --font-rounded: 'Figtree', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #f5ead8;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #17150f;
+  }
+}
