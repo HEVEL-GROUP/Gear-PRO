@@ -1,5 +1,6 @@
-image.png.app-shell {
+.app-shell {
   width: min(1120px, 92vw);
+  max-width: 100%;
   margin: 1.2rem auto 3rem;
   display: grid;
   gap: var(--space-4);
@@ -596,6 +597,12 @@ button:hover,
   border-color: #7a2f2f;
 }
 
+.status-conflict {
+  color: #ffffff;
+  background: #b3541e;
+  border-color: #b3541e;
+}
+
 .inline-check {
   display: flex !important;
   gap: 0.4rem;
@@ -983,6 +990,14 @@ button:hover,
   align-items: center;
 }
 
+.edit-gear-row {
+  width: 100%;
+  border: 1px solid #d4c9a8;
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: #faf8f5;
+}
+
 .bag-picker-row {
   display: flex;
   flex-wrap: wrap;
@@ -1163,6 +1178,77 @@ button:hover,
   margin: 0;
 }
 
+/* Toast notifications (success / info / error / undo) */
+.toast-region {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 100;
+  display: grid;
+  gap: 0.5rem;
+  width: min(440px, calc(100vw - 1.5rem));
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: #1c2b1f;
+  color: #f5f3ee;
+  border: 1px solid #3a5a3e;
+  border-radius: 12px;
+  padding: 0.7rem 0.55rem 0.7rem 0.9rem;
+  box-shadow: 0 14px 34px rgba(28, 43, 31, 0.3);
+  font-weight: 600;
+  font-size: 0.9rem;
+  animation: toast-in 0.18s ease;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.toast-message {
+  flex: 1;
+  line-height: 1.3;
+}
+
+.toast-success { border-color: #2e7d42; background: #1d3a26; }
+.toast-error { background: #7a2f2f; border-color: #9a4040; }
+.toast-undo { border-color: #c9925a; }
+
+.toast-action {
+  background: #c9925a;
+  color: #1c2b1f;
+  border-radius: 8px;
+  padding: 0.38rem 0.72rem;
+  font-weight: 800;
+  font-size: 0.82rem;
+  flex-shrink: 0;
+}
+
+.toast-action:hover { box-shadow: none; transform: none; }
+
+.toast-close {
+  background: transparent;
+  color: inherit;
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 0.15rem 0.4rem;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.toast-close:hover { opacity: 1; box-shadow: none; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}
+
 @media (max-width: 900px) {
   .app-shell {
     width: min(100%, 96vw);
@@ -1178,7 +1264,7 @@ button:hover,
     position: fixed;
     left: 0.5rem;
     right: 0.5rem;
-    bottom: 0.5rem;
+    bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
     z-index: 50;
     border-radius: 14px;
     box-shadow: var(--shadow-strong);
@@ -1188,6 +1274,40 @@ button:hover,
 
   .tabs button {
     min-width: 110px;
+    min-height: 44px;
+  }
+
+  /* Lift toasts above the fixed bottom tab bar */
+  .toast-region {
+    bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+    width: calc(100vw - 1rem);
+  }
+
+  /* 16px inputs stop iOS Safari from auto-zooming on focus */
+  .form input,
+  .form select,
+  .field-block input,
+  .field-block select,
+  .field-block textarea,
+  .sheet-row input,
+  .sheet-row select,
+  .row input,
+  .row select,
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* Comfortable tap targets */
+  .btn,
+  button,
+  .upload {
+    min-height: 44px;
+  }
+
+  .template-color-input {
+    min-height: 44px;
   }
 
   .card-grid,
@@ -1254,17 +1374,84 @@ button:hover,
     grid-column: 1 / -1;
   }
 
+  /* Packing sheet -> stacked, labeled cards on phones */
   .assignment-sheet {
     grid-template-columns: 1fr;
+    border: none;
+    background: transparent;
+    gap: 0.65rem;
   }
 
   .assignment-sheet .sheet-head {
     display: none;
   }
 
+  .sheet-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+    border: 1px solid #e8e4dc;
+    border-radius: 12px;
+    background: #ffffff;
+    padding: 0.75rem 0.85rem;
+    box-shadow: 0 6px 16px rgba(28, 43, 31, 0.06);
+  }
+
   .sheet-row > div {
-    border-top: none;
-    border-bottom: 1px solid #e8e4dc;
+    border: none;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    background: transparent;
+  }
+
+  .sheet-row > div[data-label]::before {
+    content: attr(data-label);
+    color: #3a5a3e;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    flex: 0 0 auto;
+  }
+
+  .sheet-row .sheet-item {
+    font-size: 1.02rem;
+    font-weight: 800;
+    color: #1c2b1f;
+    justify-content: flex-start;
+    padding-left: 0.55rem;
+    margin-bottom: 0.1rem;
+  }
+
+  .sheet-row [data-label="Qty"] input {
+    width: 84px;
+    text-align: center;
+  }
+
+  .sheet-row [data-label="Check in"] input[type="checkbox"],
+  .sheet-row [data-label="Essential"] input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+  }
+
+  .sheet-row [data-label="Status"] {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .sheet-row [data-label="Status"] select {
+    flex: 1 1 100%;
+  }
+
+  .sheet-row .sheet-action {
+    margin-top: 0.15rem;
+  }
+
+  .sheet-row .sheet-action .btn {
+    width: 100%;
   }
 
   .field-grid.two-col {

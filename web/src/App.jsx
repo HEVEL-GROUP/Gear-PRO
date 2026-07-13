@@ -95,6 +95,7 @@ function normalizeTrip(trip) {
           : (STATUS_OPTIONS.includes(assignment.status) ? assignment.status : 'reserved'),
         essential: Boolean(assignment.essential),
         note: assignment.note || '',
+        preCheckInStatus: NOT_CHECKED_IN_STATUSES.includes(assignment.preCheckInStatus) ? assignment.preCheckInStatus : undefined,
       }))
       : [],
   }
@@ -148,10 +149,6 @@ function loadState() {
 
 function saveState(nextState) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState))
-}
-
-function confirmDelete(message) {
-  return window.confirm(message)
 }
 
 function NavIcon({ name }) {
@@ -247,6 +244,35 @@ function App() {
   const [templateForm, setTemplateForm] = useState({ label: '', maxWeight: '35', color: '#2e7d42' })
   const [editingTemplateId, setEditingTemplateId] = useState(null)
   const [editTemplateForm, setEditTemplateForm] = useState({ label: '', maxWeight: '35', color: '#2e7d42' })
+  const [editingGearId, setEditingGearId] = useState(null)
+  const [editGearForm, setEditGearForm] = useState({ brand: '', name: '', category: 'Other', weight: '', quantity: '1', expirationDate: '', notes: '' })
+  const [toasts, setToasts] = useState([])
+
+  const dismissToast = (id) => setToasts((prev) => prev.filter((toast) => toast.id !== id))
+
+  const pushToast = ({ message, tone = 'info', actionLabel, onAction, duration }) => {
+    const id = crypto.randomUUID()
+    const life = duration ?? (actionLabel ? 7000 : 3800)
+    setToasts((prev) => [...prev.slice(-3), { id, message, tone, actionLabel, onAction }])
+    if (life > 0) window.setTimeout(() => dismissToast(id), life)
+    return id
+  }
+
+  const notify = (message, tone = 'info') => pushToast({ message, tone })
+
+  // Delete immediately, then offer a short-lived Undo that restores the pre-delete snapshot.
+  const undoableDelete = (message, snapshot, restoreExtra) => {
+    pushToast({
+      message,
+      tone: 'undo',
+      actionLabel: 'Undo',
+      onAction: () => {
+        saveState(snapshot)
+        setAppState(snapshot)
+        restoreExtra?.()
+      },
+    })
+  }
 
   const selectedTrip = useMemo(
     () => appState.trips.find((trip) => trip.id === selectedTripId) || null,
@@ -514,17 +540,16 @@ function App() {
     )
   }, [selectedTrip, selectedAssignBagId])
 
-  const conflictCount = useMemo(() => {
-    let count = 0
-    appState.trips.forEach((trip) => {
-      trip.assignments.forEach((assignment) => {
-        const totalAvailable = gearById[assignment.gearId]?.quantity || 0
-        const checkedOutElsewhere = (checkedOutByGear[assignment.gearId] || 0) - (assignment.status === 'checked_out' ? assignment.quantity : 0)
-        if (assignment.quantity > Math.max(totalAvailable - checkedOutElsewhere, 0)) count += 1
-      })
-    })
-    return count
-  }, [appState.trips, checkedOutByGear, gearById])
+  // A gear item is "over-packed" when it is marked Packed (checked out) in more
+  // places at once than you actually own. Counted per gear item, not per assignment,
+  // so one double-booking is one conflict — not two.
+  const overPackedGearIds = useMemo(() => new Set(
+    appState.gear
+      .filter((item) => (checkedOutByGear[item.id] || 0) > (item.quantity || 0))
+      .map((item) => item.id),
+  ), [appState.gear, checkedOutByGear])
+
+  const conflictCount = overPackedGearIds.size
 
   const updateState = (updater) => {
     setAppState((prev) => {
@@ -561,16 +586,76 @@ function App() {
   const removeGear = (gearId) => {
     const inUse = appState.trips.some((trip) => trip.assignments.some((assignment) => assignment.gearId === gearId))
     if (inUse) {
-      window.alert('This gear is assigned to a trip. Remove assignments first.')
+      notify('That gear is assigned to a trip. Remove it from the trip first.', 'error')
       return
     }
-    if (!confirmDelete('Delete this gear item? This cannot be undone.')) return
+    const snapshot = appState
+    const item = gearById[gearId]
     updateState((prev) => ({ ...prev, gear: prev.gear.filter((item) => item.id !== gearId) }))
+    undoableDelete(`Deleted ${item ? `${item.brand} ${item.name}`.trim() : 'gear item'}`, snapshot)
+  }
+
+  const startEditGear = (item) => {
+    setEditingGearId(item.id)
+    setEditGearForm({
+      brand: item.brand || '',
+      name: item.name || '',
+      category: item.category || (allCategories[0] || 'Other'),
+      weight: String(item.weight ?? ''),
+      quantity: String(item.quantity ?? '1'),
+      expirationDate: normalizeExpirationDate(item.expirationDate),
+      notes: item.notes || '',
+    })
+  }
+
+  const cancelEditGear = () => {
+    setEditingGearId(null)
+    setEditGearForm({ brand: '', name: '', category: 'Other', weight: '', quantity: '1', expirationDate: '', notes: '' })
+  }
+
+  const saveEditGear = (event) => {
+    event.preventDefault()
+    if (!editingGearId) return
+    const weight = Number(editGearForm.weight)
+    const quantity = Number(editGearForm.quantity)
+    if (!editGearForm.brand.trim() || !editGearForm.name.trim() || Number.isNaN(weight) || weight <= 0 || Number.isNaN(quantity) || quantity <= 0) {
+      notify('Brand, item name, a weight above 0, and a quantity of at least 1 are required.', 'error')
+      return
+    }
+    // You can't own fewer than you currently have packed (checked out) right now.
+    const packedNow = checkedOutByGear[editingGearId] || 0
+    if (quantity < packedNow) {
+      notify(`You have ${packedNow} of this item packed right now — owned quantity can’t be below that. Check items back in first.`, 'error')
+      return
+    }
+    updateState((prev) => ({
+      ...prev,
+      gear: prev.gear.map((item) => (
+        item.id === editingGearId
+          ? {
+            ...item,
+            brand: editGearForm.brand.trim(),
+            name: editGearForm.name.trim(),
+            category: editGearForm.category.trim() || 'Other',
+            weight,
+            quantity,
+            expirationDate: normalizeExpirationDate(editGearForm.expirationDate),
+            notes: editGearForm.notes.trim(),
+          }
+          : item
+      )),
+    }))
+    notify('Gear updated.', 'success')
+    cancelEditGear()
   }
 
   const addTrip = (event) => {
     event.preventDefault()
     if (!tripForm.name || !tripForm.startDate || !tripForm.endDate) return
+    if (tripForm.endDate < tripForm.startDate) {
+      notify('End date can’t be before the start date.', 'error')
+      return
+    }
     const selectedTemplates = appState.packTemplates.filter((template) => tripTemplateSelections.includes(template.id))
     const myPackTemplate = appState.packTemplates.find((pack) => isMyPackLabel(pack.label))
     const fallbackTemplate = myPackTemplate || appState.packTemplates[0]
@@ -594,12 +679,19 @@ function App() {
   }
 
   const removeTrip = (tripId) => {
-    if (!confirmDelete('Delete this trip and all its assignments?')) return
-    updateState((prev) => ({ ...prev, trips: prev.trips.filter((trip) => trip.id !== tripId) }))
+    const snapshot = appState
+    const prevSelectedTripId = selectedTripId
+    const trip = appState.trips.find((item) => item.id === tripId)
+    updateState((prev) => ({ ...prev, trips: prev.trips.filter((item) => item.id !== tripId) }))
     if (selectedTripId === tripId) {
-      const nextTrip = appState.trips.find((trip) => trip.id !== tripId)
+      const nextTrip = appState.trips.find((item) => item.id !== tripId)
       setSelectedTripId(nextTrip?.id || null)
     }
+    undoableDelete(
+      `Deleted trip “${trip?.name || 'Unnamed'}”`,
+      snapshot,
+      () => setSelectedTripId(prevSelectedTripId),
+    )
   }
 
   const addCategory = (event) => {
@@ -607,7 +699,7 @@ function App() {
     const clean = newCategoryName.trim()
     if (!clean) return
     if (allCategories.includes(clean)) {
-      window.alert('Category already exists.')
+      notify('That category already exists.', 'error')
       return
     }
     updateState((prev) => ({
@@ -625,7 +717,7 @@ function App() {
     const clean = renamed.trim()
     if (!clean || clean === categoryName) return
     if (allCategories.includes(clean)) {
-      window.alert('A category with that name already exists.')
+      notify('A category with that name already exists.', 'error')
       return
     }
     updateState((prev) => ({
@@ -638,7 +730,7 @@ function App() {
   }
 
   const deleteCategory = (categoryName) => {
-    if (!confirmDelete(`Delete category "${categoryName}"? Items will be reassigned.`)) return
+    const snapshot = appState
     const fallbackCategory = allCategories.find((item) => item !== categoryName) || 'Uncategorized'
     updateState((prev) => ({
       ...prev,
@@ -656,6 +748,7 @@ function App() {
     if (gearForm.category === categoryName) {
       setGearForm((prev) => ({ ...prev, category: fallbackCategory }))
     }
+    undoableDelete(`Deleted category “${categoryName}” · items moved to ${fallbackCategory}`, snapshot)
   }
 
   const bulkReplaceCategory = (event) => {
@@ -742,11 +835,13 @@ function App() {
   }
 
   const removePackTemplate = (templateId) => {
-    if (!confirmDelete('Delete this default pack template?')) return
+    const snapshot = appState
+    const template = appState.packTemplates.find((pack) => pack.id === templateId)
     updateState((prev) => ({
       ...prev,
       packTemplates: prev.packTemplates.filter((pack) => pack.id !== templateId),
     }))
+    undoableDelete(`Deleted pack template “${template?.label || 'template'}”`, snapshot)
   }
 
   const setTripBagInclusion = (template, include) => {
@@ -758,7 +853,7 @@ function App() {
     if (!include && existingBag) {
       const hasAssignments = selectedTrip.assignments.some((assignment) => assignment.bagId === existingBag.id)
       if (hasAssignments) {
-        window.alert('This bag has assigned gear. Move or remove those assignments first.')
+        notify('That bag has assigned gear. Move or remove those items first.', 'error')
         return
       }
     }
@@ -826,7 +921,7 @@ function App() {
     event.preventDefault()
     if (!selectedTrip || !selectedAssignBagId) return
     if (batchSelectedGearIds.length === 0) {
-      window.alert('Select at least one gear item first.')
+      notify('Select at least one gear item first.', 'error')
       return
     }
     let addedCount = 0
@@ -888,7 +983,9 @@ function App() {
     setBatchSelectedGearIds([])
     setBatchItemSettings({})
     if (skippedCount > 0) {
-      window.alert(`${addedCount} item(s) assigned (${addedUnits} total qty). ${skippedCount} skipped because there is no remaining available quantity.`)
+      notify(`Added ${addedUnits} to bag · ${skippedCount} skipped (none left available).`, 'info')
+    } else if (addedCount > 0) {
+      notify(`Added ${addedCount} item${addedCount === 1 ? '' : 's'} (${addedUnits} total) to the bag.`, 'success')
     }
   }
 
@@ -916,15 +1013,25 @@ function App() {
   )
 
   const setCheckedBackIn = (assignment, checked) => {
-    const nextStatus = checked
-      ? 'returned'
-      : (CHECKED_IN_STATUSES.includes(assignment.status) ? 'checked_out' : assignment.status)
-    updateAssignment(assignment.id, { status: nextStatus })
+    if (checked) {
+      // Remember where we came from (Planned vs Packed) so un-checking can restore it.
+      const from = NOT_CHECKED_IN_STATUSES.includes(assignment.status)
+        ? assignment.status
+        : (assignment.preCheckInStatus || 'checked_out')
+      updateAssignment(assignment.id, { status: 'returned', preCheckInStatus: from })
+      return
+    }
+    const restore = NOT_CHECKED_IN_STATUSES.includes(assignment.preCheckInStatus)
+      ? assignment.preCheckInStatus
+      : 'checked_out'
+    updateAssignment(assignment.id, { status: restore, preCheckInStatus: null })
   }
 
   const deleteAssignment = (assignmentId) => {
     if (!selectedTrip) return
-    if (!confirmDelete('Remove this assigned item from the trip?')) return
+    const snapshot = appState
+    const assignment = selectedTrip.assignments.find((item) => item.id === assignmentId)
+    const gearLabel = assignment ? `${gearById[assignment.gearId]?.brand || ''} ${gearById[assignment.gearId]?.name || ''}`.trim() : ''
     updateState((prev) => ({
       ...prev,
       trips: prev.trips.map((trip) => (
@@ -933,6 +1040,7 @@ function App() {
           : trip
       )),
     }))
+    undoableDelete(`Removed ${gearLabel || 'item'} from the trip`, snapshot)
   }
 
   const markAssignmentResolved = (tripId, assignmentId) => {
@@ -980,13 +1088,20 @@ function App() {
     const content = await file.text()
     try {
       const parsed = JSON.parse(content)
-      const normalized = normalizeState(parsed?.data)
+      // Accept either the wrapped export ({ data: {...} }) or a raw state object,
+      // but only if it actually looks like Gear Pro data — never silently wipe.
+      const payload = parsed?.data ?? parsed
+      if (!payload || !Array.isArray(payload.gear) || !Array.isArray(payload.trips)) {
+        notify('That file isn’t a Gear Pro backup — your data was left untouched.', 'error')
+        return
+      }
+      const normalized = normalizeState(payload)
       saveState(normalized)
       setAppState(normalized)
       setSelectedTripId(normalized.trips[0]?.id || null)
-      window.alert('Backup imported successfully.')
+      notify('Backup imported successfully.', 'success')
     } catch {
-      window.alert('Could not read backup file. Please use a valid JSON backup.')
+      notify('Could not read that backup file. Please use a valid JSON backup.', 'error')
     } finally {
       event.target.value = ''
     }
@@ -1036,7 +1151,7 @@ function App() {
         .map((line) => line.trim())
         .filter((line) => line.length > 0)
       if (lines.length < 2) {
-        window.alert('CSV appears empty. Please use the template format.')
+        notify('That CSV looks empty. Use the template format.', 'error')
         return
       }
 
@@ -1052,7 +1167,7 @@ function App() {
         notes: headerCells.indexOf('notes'),
       }
       if (idx.brand < 0 || idx.name < 0 || idx.category < 0 || idx.weight < 0 || idx.quantity < 0) {
-        window.alert('CSV is missing required columns. Use the template and keep header names.')
+        notify('CSV is missing required columns. Use the template and keep the header names.', 'error')
         return
       }
 
@@ -1103,9 +1218,10 @@ function App() {
         updateState((prev) => ({ ...prev, gear: [...prev.gear, ...toAdd] }))
       }
 
-      window.alert(`CSV import complete. Added: ${toAdd.length}, duplicates skipped: ${skippedDuplicates}, invalid rows skipped: ${skippedInvalid}.`)
+      const importTone = toAdd.length > 0 ? 'success' : 'info'
+      notify(`Import done · added ${toAdd.length}, ${skippedDuplicates} duplicate(s) skipped, ${skippedInvalid} invalid skipped.`, importTone)
     } catch {
-      window.alert('Could not import CSV. Please verify the file format.')
+      notify('Could not import that CSV. Please check the file format.', 'error')
     } finally {
       event.target.value = ''
     }
@@ -1283,35 +1399,89 @@ function App() {
             </div>
             {filteredGear.length === 0 ? <p>No gear matches your filter.</p> : filteredGear.map((item) => (
               <div className="list-item" key={item.id}>
-                <div>
-                  <strong>{item.brand} {item.name}</strong>
-                  <p>
-                    <span className="pill">{item.category}</span>
-                    {' '}
-                    {item.weight}
-                    {' '}
-                    lbs • Owned
-                    {' '}
-                    {item.quantity}
-                    {' '}
-                    • Checked out
-                    {' '}
-                    {checkedOutByGear[item.id] || 0}
-                    {item.expirationDate ? ` • Expires ${item.expirationDate}` : ''}
-                  </p>
-                  {isExpiredDate(item.expirationDate) ? (
-                    <p><span className={`status-badge ${STATUS_CLASS.expired}`}>{STATUS_LABELS.expired}</span></p>
-                  ) : null}
-                  {(gearStatusById[item.id] || []).length > 0 ? (
-                    <p>
-                      {(gearStatusById[item.id] || []).map((status) => (
-                        <span key={status} className={`status-badge ${STATUS_CLASS[status]}`}>{STATUS_LABELS[status]}</span>
-                      ))}
-                    </p>
-                  ) : null}
-                  {item.notes ? <p>{item.notes}</p> : null}
-                </div>
-                <button type="button" className="btn btn-danger" onClick={() => removeGear(item.id)}>Delete</button>
+                {editingGearId === item.id ? (
+                  <form className="edit-gear-row control-group" onSubmit={saveEditGear}>
+                    <div className="field-grid two-col">
+                      <div className="field-block">
+                        <label>Brand *</label>
+                        <input value={editGearForm.brand} onChange={(e) => setEditGearForm((p) => ({ ...p, brand: e.target.value }))} required />
+                      </div>
+                      <div className="field-block">
+                        <label>Item Name *</label>
+                        <input value={editGearForm.name} onChange={(e) => setEditGearForm((p) => ({ ...p, name: e.target.value }))} required />
+                      </div>
+                    </div>
+                    <div className="field-grid two-col">
+                      <div className="field-block">
+                        <label>Category</label>
+                        <select value={editGearForm.category} onChange={(e) => setEditGearForm((p) => ({ ...p, category: e.target.value }))}>
+                          {allCategories.map((category) => (<option key={category} value={category}>{category}</option>))}
+                        </select>
+                      </div>
+                      <div className="field-block">
+                        <label>Weight (lbs) *</label>
+                        <input type="number" min="0.01" step="0.01" value={editGearForm.weight} onChange={(e) => setEditGearForm((p) => ({ ...p, weight: e.target.value }))} required />
+                      </div>
+                      <div className="field-block">
+                        <label>Owned Quantity *</label>
+                        <input type="number" min="1" step="1" value={editGearForm.quantity} onChange={(e) => setEditGearForm((p) => ({ ...p, quantity: e.target.value }))} required />
+                      </div>
+                      <div className="field-block">
+                        <label>Expiration (optional)</label>
+                        <input type="date" value={editGearForm.expirationDate} onChange={(e) => setEditGearForm((p) => ({ ...p, expirationDate: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div className="field-block">
+                      <label>Notes</label>
+                      <textarea value={editGearForm.notes} onChange={(e) => setEditGearForm((p) => ({ ...p, notes: e.target.value }))} rows="2" />
+                    </div>
+                    {(checkedOutByGear[item.id] || 0) > 0 ? (
+                      <p className="muted">{checkedOutByGear[item.id]} packed right now · owned can’t go below that.</p>
+                    ) : null}
+                    <div className="form-toolbar">
+                      <button type="button" className="btn btn-ghost" onClick={cancelEditGear}>Cancel</button>
+                      <button type="submit" className="btn btn-primary">Save Changes</button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <div>
+                      <strong>{item.brand} {item.name}</strong>
+                      <p>
+                        <span className="pill">{item.category}</span>
+                        {' '}
+                        {Number(item.weight).toFixed(2)}
+                        {' '}
+                        lbs • Owned
+                        {' '}
+                        {item.quantity}
+                        {' '}
+                        • Checked out
+                        {' '}
+                        {checkedOutByGear[item.id] || 0}
+                        {item.expirationDate ? ` • Expires ${item.expirationDate}` : ''}
+                      </p>
+                      {isExpiredDate(item.expirationDate) ? (
+                        <p><span className={`status-badge ${STATUS_CLASS.expired}`}>{STATUS_LABELS.expired}</span></p>
+                      ) : null}
+                      {overPackedGearIds.has(item.id) ? (
+                        <p><span className="status-badge status-conflict" title="Packed in more places than you own">Over-packed — check trips</span></p>
+                      ) : null}
+                      {(gearStatusById[item.id] || []).length > 0 ? (
+                        <p>
+                          {(gearStatusById[item.id] || []).map((status) => (
+                            <span key={status} className={`status-badge ${STATUS_CLASS[status]}`}>{STATUS_LABELS[status]}</span>
+                          ))}
+                        </p>
+                      ) : null}
+                      {item.notes ? <p>{item.notes}</p> : null}
+                    </div>
+                    <div className="button-group">
+                      <button type="button" className="btn btn-secondary" onClick={() => startEditGear(item)}>Edit</button>
+                      <button type="button" className="btn btn-danger" onClick={() => removeGear(item.id)}>Delete</button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -1593,13 +1763,13 @@ function App() {
                       {assignments.map((assignment) => (
                         <div className="sheet-row" key={assignment.id}>
                           <div className={`sheet-item status-accent-${assignment.status}`}>{gearById[assignment.gearId]?.brand} {gearById[assignment.gearId]?.name}</div>
-                          <div>
+                          <div data-label="Bag">
                             <span className="bag-cell-pill">
                               <span className="bag-color-dot" style={{ backgroundColor: selectedTrip.bags.find((bag) => bag.id === assignment.bagId)?.color || bagColorForLabel(selectedTrip.bags.find((bag) => bag.id === assignment.bagId)?.label || 'Unknown Bag') }} />
                               {selectedTrip.bags.find((bag) => bag.id === assignment.bagId)?.label || 'Unknown Bag'}
                             </span>
                           </div>
-                          <div>
+                          <div data-label="Qty">
                             <input
                               type="number"
                               min="1"
@@ -1607,7 +1777,7 @@ function App() {
                               onChange={(e) => updateAssignment(assignment.id, { quantity: Number(e.target.value) || 1 })}
                             />
                           </div>
-                          <div>
+                          <div data-label="Status">
                             <select value={assignment.status} onChange={(e) => updateAssignment(assignment.id, { status: e.target.value })}>
                               {statusOptionsForAssignment(assignment).map((status) => (
                                 <option key={status} value={status}>{STATUS_LABELS[status]}</option>
@@ -1617,18 +1787,21 @@ function App() {
                             {isExpiredDate(gearById[assignment.gearId]?.expirationDate) ? (
                               <span className={`status-badge ${STATUS_CLASS.expired}`}>{STATUS_LABELS.expired}</span>
                             ) : null}
+                            {overPackedGearIds.has(assignment.gearId) && assignment.status === 'checked_out' ? (
+                              <span className="status-badge status-conflict" title="Packed in more places than you own">Over-packed</span>
+                            ) : null}
                           </div>
-                          <div>
+                          <div data-label="Check in">
                             <input
                               type="checkbox"
                               checked={isCheckedBackIn(assignment)}
                               onChange={(e) => setCheckedBackIn(assignment, e.target.checked)}
                             />
                           </div>
-                          <div>
+                          <div data-label="Essential">
                             <input type="checkbox" checked={assignment.essential} onChange={(e) => updateAssignment(assignment.id, { essential: e.target.checked })} />
                           </div>
-                          <div>
+                          <div className="sheet-action">
                             <button type="button" className="btn btn-danger" onClick={() => deleteAssignment(assignment.id)}>Remove</button>
                           </div>
                         </div>
@@ -1807,6 +1980,24 @@ function App() {
           </div>
         </section>
       )}
+
+      <div className="toast-region" role="status" aria-live="polite">
+        {toasts.map((toast) => (
+          <div key={toast.id} className={`toast toast-${toast.tone || 'info'}`}>
+            <span className="toast-message">{toast.message}</span>
+            {toast.actionLabel ? (
+              <button
+                type="button"
+                className="toast-action"
+                onClick={() => { toast.onAction?.(); dismissToast(toast.id) }}
+              >
+                {toast.actionLabel}
+              </button>
+            ) : null}
+            <button type="button" className="toast-close" aria-label="Dismiss" onClick={() => dismissToast(toast.id)}>×</button>
+          </div>
+        ))}
+      </div>
     </main>
   )
 }
