@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
@@ -60,7 +61,26 @@ export default function GearScreen() {
 
       {filtered.map((g) => (
         <Pressable key={g.id} onPress={() => setModal({ open: true, editId: g.id })} style={{ marginBottom: 10 }}>
-          <Card style={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Card style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            {g.photoUri ? (
+              <Image
+                source={{ uri: g.photoUri }}
+                style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: t.surfaceAlt }}
+                contentFit="cover"
+              />
+            ) : (
+              <View
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 12,
+                  backgroundColor: t.soft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Ionicons name="image-outline" size={22} color={t.softText} />
+              </View>
+            )}
             <View style={{ flex: 1 }}>
               <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text }}>
                 {g.brand} {g.name}

@@ -19,6 +19,7 @@ export type GearItem = {
   quantity: number;
   notes?: string;
   expiration?: string;
+  photoUri?: string;
 };
 
 export type Bag = { id: string; label: string; maxWeightLb: number; color: string };
