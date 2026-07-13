@@ -1,0 +1,110 @@
+/* 
+  Localizable.strings
+  GearPro2 - Italian
+
+  Created by Austin Norville on 10/21/25.
+*/
+
+// Navigation
+"Dashboard" = "Pannello";
+"Trips" = "Viaggi";
+"Gear Library" = "Biblioteca attrezzatura";
+"Meal Planning" = "Pianificazione pasti";
+"Packing" = "Imballaggio";
+"Settings" = "Impostazioni";
+
+// Settings
+"Account" = "Account";
+"Edit Profile" = "Modifica profilo";
+"Personal Information" = "Informazioni personali";
+"First Name" = "Nome";
+"Last Name" = "Cognome";
+"Email" = "Email";
+"Save" = "Salva";
+"Cancel" = "Annulla";
+
+"Preferences" = "Preferenze";
+"Push Notifications" = "Notifiche push";
+"Trip Reminders" = "Promemoria viaggio";
+"Days ahead" = "Giorni prima";
+"You'll receive notifications for upcoming trips" = "Riceverai notifiche per i prossimi viaggi";
+"Enable notifications to get reminders about upcoming trips" = "Abilita le notifiche per ricevere promemoria sui prossimi viaggi";
+"Status" = "Stato";
+"Test Notification" = "Notifica di prova";
+"Test Permission Request" = "Richiesta di autorizzazione di prova";
+"Enable" = "Abilita";
+
+"Language" = "Lingua";
+"Dark Mode" = "Modalità scura";
+
+"Data Storage" = "Archiviazione dati";
+"Storage Mode" = "Modalità di archiviazione";
+"Apple Cloud" = "Apple Cloud";
+"Offline Only" = "Solo offline";
+
+"Account Actions" = "Azioni account";
+"Logout" = "Esci";
+"Delete Account" = "Elimina account";
+"Are you sure you want to logout?" = "Sei sicuro di voler uscire?";
+"This will permanently delete your account and all data. This action cannot be undone." = "Questo eliminerà permanentemente il tuo account e tutti i dati. Questa azione non può essere annullata.";
+
+// Trip related
+"Add Trip" = "Aggiungi viaggio";
+"Trip Name" = "Nome viaggio";
+"Location" = "Posizione";
+"Start Date" = "Data di inizio";
+"End Date" = "Data di fine";
+"Trip Status" = "Stato viaggio";
+"Planned" = "Pianificato";
+"In Progress" = "In corso";
+"Completed" = "Completato";
+"Cancelled" = "Annullato";
+
+// Gear related
+"Add Gear" = "Aggiungi attrezzatura";
+"Gear Name" = "Nome attrezzatura";
+"Category" = "Categoria";
+"Weight" = "Peso";
+"Essential" = "Essenziale";
+"Optional" = "Opzionale";
+
+// Meal related
+"Add Meal" = "Aggiungi pasto";
+"Meal Name" = "Nome pasto";
+"Servings" = "Porzioni";
+"Calories per Serving" = "Calorie per porzione";
+
+// Common actions
+"Add" = "Aggiungi";
+"Edit" = "Modifica";
+"Delete" = "Elimina";
+"Done" = "Fatto";
+"Back" = "Indietro";
+"Next" = "Avanti";
+"Previous" = "Precedente";
+
+// Notifications
+"Test Trip Reminder" = "Promemoria viaggio di prova";
+"This is a test notification! Your notification system is working correctly." = "Questa è una notifica di prova! Il tuo sistema di notifica funziona correttamente.";
+"Your trip '%@' to %@ starts in %d day(s)!" = "Il tuo viaggio '%@' a %@ inizia tra %d giorno/i!";
+
+// Support
+"Support" = "Supporto";
+"Help" = "Aiuto";
+"Send Feedback" = "Invia feedback";
+"Terms of Service" = "Termini di servizio";
+"Privacy Policy" = "Informativa sulla privacy";
+"Help & Support" = "Aiuto e supporto";
+"Last Updated: October 2025" = "Ultimo aggiornamento: Ottobre 2025";
+
+// Language names
+"English" = "Inglese";
+"Spanish" = "Spagnolo";
+"French" = "Francese";
+"German" = "Tedesco";
+"Italian" = "Italiano";
+"Portuguese" = "Portoghese";
+"Chinese" = "Cinese";
+"Japanese" = "Giapponese";
+"Korean" = "Coreano";
+

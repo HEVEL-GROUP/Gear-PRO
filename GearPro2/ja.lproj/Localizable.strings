@@ -1,0 +1,110 @@
+/* 
+  Localizable.strings
+  GearPro2 - Japanese
+
+  Created by Austin Norville on 10/21/25.
+*/
+
+// Navigation
+"Dashboard" = "ダッシュボード";
+"Trips" = "旅行";
+"Gear Library" = "ギアライブラリ";
+"Meal Planning" = "食事計画";
+"Packing" = "パッキング";
+"Settings" = "設定";
+
+// Settings
+"Account" = "アカウント";
+"Edit Profile" = "プロフィール編集";
+"Personal Information" = "個人情報";
+"First Name" = "名";
+"Last Name" = "姓";
+"Email" = "メール";
+"Save" = "保存";
+"Cancel" = "キャンセル";
+
+"Preferences" = "環境設定";
+"Push Notifications" = "プッシュ通知";
+"Trip Reminders" = "旅行リマインダー";
+"Days ahead" = "事前日数";
+"You'll receive notifications for upcoming trips" = "今後の旅行の通知を受け取ります";
+"Enable notifications to get reminders about upcoming trips" = "通知を有効にして、今後の旅行のリマインダーを受け取ります";
+"Status" = "ステータス";
+"Test Notification" = "テスト通知";
+"Test Permission Request" = "権限リクエストのテスト";
+"Enable" = "有効にする";
+
+"Language" = "言語";
+"Dark Mode" = "ダークモード";
+
+"Data Storage" = "データストレージ";
+"Storage Mode" = "ストレージモード";
+"Apple Cloud" = "Apple Cloud";
+"Offline Only" = "オフラインのみ";
+
+"Account Actions" = "アカウント操作";
+"Logout" = "ログアウト";
+"Delete Account" = "アカウント削除";
+"Are you sure you want to logout?" = "本当にログアウトしますか？";
+"This will permanently delete your account and all data. This action cannot be undone." = "これにより、アカウントとすべてのデータが完全に削除されます。この操作は元に戻せません。";
+
+// Trip related
+"Add Trip" = "旅行を追加";
+"Trip Name" = "旅行名";
+"Location" = "場所";
+"Start Date" = "開始日";
+"End Date" = "終了日";
+"Trip Status" = "旅行ステータス";
+"Planned" = "計画済み";
+"In Progress" = "進行中";
+"Completed" = "完了";
+"Cancelled" = "キャンセル";
+
+// Gear related
+"Add Gear" = "ギアを追加";
+"Gear Name" = "ギア名";
+"Category" = "カテゴリ";
+"Weight" = "重量";
+"Essential" = "必須";
+"Optional" = "オプション";
+
+// Meal related
+"Add Meal" = "食事を追加";
+"Meal Name" = "食事名";
+"Servings" = "人前";
+"Calories per Serving" = "1人前あたりのカロリー";
+
+// Common actions
+"Add" = "追加";
+"Edit" = "編集";
+"Delete" = "削除";
+"Done" = "完了";
+"Back" = "戻る";
+"Next" = "次へ";
+"Previous" = "前へ";
+
+// Notifications
+"Test Trip Reminder" = "テスト旅行リマインダー";
+"This is a test notification! Your notification system is working correctly." = "これはテスト通知です！通知システムは正常に動作しています。";
+"Your trip '%@' to %@ starts in %d day(s)!" = "旅行 '%@' から %@ まで %d 日後に開始します！";
+
+// Support
+"Support" = "サポート";
+"Help" = "ヘルプ";
+"Send Feedback" = "フィードバックを送信";
+"Terms of Service" = "利用規約";
+"Privacy Policy" = "プライバシーポリシー";
+"Help & Support" = "ヘルプとサポート";
+"Last Updated: October 2025" = "最終更新：2025年10月";
+
+// Language names
+"English" = "英語";
+"Spanish" = "スペイン語";
+"French" = "フランス語";
+"German" = "ドイツ語";
+"Italian" = "イタリア語";
+"Portuguese" = "ポルトガル語";
+"Chinese" = "中国語";
+"Japanese" = "日本語";
+"Korean" = "韓国語";
+

@@ -1,0 +1,147 @@
+/* 
+  Localizable.strings
+  GearPro2
+
+  Created by Austin Norville on 10/21/25.
+*/
+
+// Navigation
+"Dashboard" = "Dashboard";
+"Trips" = "Trips";
+"Gear Library" = "Gear Library";
+"Meal Planning" = "Meal Planning";
+"Packing" = "Packing";
+"Settings" = "Settings";
+
+// Settings
+"Account" = "Account";
+"Edit Profile" = "Edit Profile";
+"Personal Information" = "Personal Information";
+"First Name" = "First Name";
+"Last Name" = "Last Name";
+"Email" = "Email";
+"Save" = "Save";
+"Cancel" = "Cancel";
+
+"Preferences" = "Preferences";
+"Push Notifications" = "Push Notifications";
+"Trip Reminders" = "Trip Reminders";
+"Days ahead" = "Days ahead";
+"You'll receive notifications for upcoming trips" = "You'll receive notifications for upcoming trips";
+"Enable notifications to get reminders about upcoming trips" = "Enable notifications to get reminders about upcoming trips";
+"Status" = "Status";
+"Test Notification" = "Test Notification";
+"Test Permission Request" = "Test Permission Request";
+"Enable" = "Enable";
+
+"Language" = "Language";
+"Dark Mode" = "Dark Mode";
+
+"Data Storage" = "Data Storage";
+"Storage Mode" = "Storage Mode";
+"Apple Cloud" = "Apple Cloud";
+"Offline Only" = "Offline Only";
+
+"Account Actions" = "Account Actions";
+"Logout" = "Logout";
+"Delete Account" = "Delete Account";
+"Are you sure you want to logout?" = "Are you sure you want to logout?";
+"This will permanently delete your account and all data. This action cannot be undone." = "This will permanently delete your account and all data. This action cannot be undone.";
+
+// Trip related
+"Add Trip" = "Add Trip";
+"Trip Name" = "Trip Name";
+"Location" = "Location";
+"Start Date" = "Start Date";
+"End Date" = "End Date";
+"Trip Status" = "Trip Status";
+"Planned" = "Planned";
+"In Progress" = "In Progress";
+"Completed" = "Completed";
+"Cancelled" = "Cancelled";
+
+// Gear related
+"Add Gear" = "Add Gear";
+"Gear Name" = "Gear Name";
+"Category" = "Category";
+"Weight" = "Weight";
+"Essential" = "Essential";
+"Optional" = "Optional";
+
+// Meal related
+"Add Meal" = "Add Meal";
+"Meal Name" = "Meal Name";
+"Servings" = "Servings";
+"Calories per Serving" = "Calories per Serving";
+
+// Common actions
+"Add" = "Add";
+"Edit" = "Edit";
+"Delete" = "Delete";
+"Done" = "Done";
+"Back" = "Back";
+"Next" = "Next";
+"Previous" = "Previous";
+
+// Notifications
+"Test Trip Reminder" = "Test Trip Reminder";
+"This is a test notification! Your notification system is working correctly." = "This is a test notification! Your notification system is working correctly.";
+"Your trip '%@' to %@ starts in %d day(s)!" = "Your trip '%@' to %@ starts in %d day(s)!";
+
+// Support
+"Support" = "Support";
+"Help" = "Help";
+"Send Feedback" = "Send Feedback";
+"Terms of Service" = "Terms of Service";
+"Privacy Policy" = "Privacy Policy";
+"Help & Support" = "Help & Support";
+"Last Updated: October 2025" = "Last Updated: October 2025";
+
+// Subscription
+"Free Trial" = "Free Trial";
+"Free Trial - %d days left" = "Free Trial - %d days left";
+"Active Subscription" = "Active Subscription";
+"Subscription Expired" = "Subscription Expired";
+"Free (Ad-Supported)" = "Free (Ad-Supported)";
+"Upgrade" = "Upgrade";
+"Upgrade to Premium" = "Upgrade to Premium";
+"Unlock all features and remove ads" = "Unlock all features and remove ads";
+"%d days left in your free trial" = "%d days left in your free trial";
+"Premium Features" = "Premium Features";
+"Unlimited trips and gear items" = "Unlimited trips and gear items";
+"No advertisements" = "No advertisements";
+"Priority cloud sync" = "Priority cloud sync";
+"Advanced analytics" = "Advanced analytics";
+"Export and backup features" = "Export and backup features";
+"Subscribe Now" = "Subscribe Now";
+"Restore Purchases" = "Restore Purchases";
+"By subscribing, you agree to our Terms of Service and Privacy Policy. Subscriptions auto-renew unless cancelled 24 hours before the end of the period." = "By subscribing, you agree to our Terms of Service and Privacy Policy. Subscriptions auto-renew unless cancelled 24 hours before the end of the period.";
+"Renews: %@" = "Renews: %@";
+"Expires: %@" = "Expires: %@";
+"Manage" = "Manage";
+"Loading subscription options..." = "Loading subscription options...";
+"Product not found" = "Product not found";
+"Verification failed: %@" = "Verification failed: %@";
+"Purchase cancelled" = "Purchase cancelled";
+"Purchase pending" = "Purchase pending";
+"Unknown error" = "Unknown error";
+"Purchases restored successfully" = "Purchases restored successfully";
+"Yearly" = "Yearly";
+"Subscription" = "Subscription";
+"Advertisement" = "Advertisement";
+"Remove Ads" = "Remove Ads";
+"No Subscription Options Available" = "No Subscription Options Available";
+"Subscription products are not yet configured. Please set up subscription products in App Store Connect with the following product IDs:" = "Subscription products are not yet configured. Please set up subscription products in App Store Connect with the following product IDs:";
+"Retry" = "Retry";
+"Failed to load subscription options: %@" = "Failed to load subscription options: %@";
+
+// Language names
+"English" = "English";
+"Spanish" = "Spanish";
+"French" = "French";
+"German" = "German";
+"Italian" = "Italian";
+"Portuguese" = "Portuguese";
+"Chinese" = "Chinese";
+"Japanese" = "Japanese";
+"Korean" = "Korean";

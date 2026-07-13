@@ -1,0 +1,110 @@
+/* 
+  Localizable.strings
+  GearPro2 - Chinese (Simplified)
+
+  Created by Austin Norville on 10/21/25.
+*/
+
+// Navigation
+"Dashboard" = "仪表板";
+"Trips" = "旅行";
+"Gear Library" = "装备库";
+"Meal Planning" = "膳食计划";
+"Packing" = "打包";
+"Settings" = "设置";
+
+// Settings
+"Account" = "账户";
+"Edit Profile" = "编辑个人资料";
+"Personal Information" = "个人信息";
+"First Name" = "名字";
+"Last Name" = "姓氏";
+"Email" = "电子邮件";
+"Save" = "保存";
+"Cancel" = "取消";
+
+"Preferences" = "偏好设置";
+"Push Notifications" = "推送通知";
+"Trip Reminders" = "旅行提醒";
+"Days ahead" = "提前天数";
+"You'll receive notifications for upcoming trips" = "您将收到即将到来的旅行通知";
+"Enable notifications to get reminders about upcoming trips" = "启用通知以获取即将到来的旅行提醒";
+"Status" = "状态";
+"Test Notification" = "测试通知";
+"Test Permission Request" = "测试权限请求";
+"Enable" = "启用";
+
+"Language" = "语言";
+"Dark Mode" = "深色模式";
+
+"Data Storage" = "数据存储";
+"Storage Mode" = "存储模式";
+"Apple Cloud" = "Apple 云";
+"Offline Only" = "仅离线";
+
+"Account Actions" = "账户操作";
+"Logout" = "登出";
+"Delete Account" = "删除账户";
+"Are you sure you want to logout?" = "您确定要登出吗？";
+"This will permanently delete your account and all data. This action cannot be undone." = "这将永久删除您的账户和所有数据。此操作无法撤消。";
+
+// Trip related
+"Add Trip" = "添加旅行";
+"Trip Name" = "旅行名称";
+"Location" = "位置";
+"Start Date" = "开始日期";
+"End Date" = "结束日期";
+"Trip Status" = "旅行状态";
+"Planned" = "已计划";
+"In Progress" = "进行中";
+"Completed" = "已完成";
+"Cancelled" = "已取消";
+
+// Gear related
+"Add Gear" = "添加装备";
+"Gear Name" = "装备名称";
+"Category" = "类别";
+"Weight" = "重量";
+"Essential" = "必需品";
+"Optional" = "可选";
+
+// Meal related
+"Add Meal" = "添加膳食";
+"Meal Name" = "膳食名称";
+"Servings" = "份数";
+"Calories per Serving" = "每份卡路里";
+
+// Common actions
+"Add" = "添加";
+"Edit" = "编辑";
+"Delete" = "删除";
+"Done" = "完成";
+"Back" = "返回";
+"Next" = "下一个";
+"Previous" = "上一个";
+
+// Notifications
+"Test Trip Reminder" = "测试旅行提醒";
+"This is a test notification! Your notification system is working correctly." = "这是一条测试通知！您的通知系统运行正常。";
+"Your trip '%@' to %@ starts in %d day(s)!" = "您的旅行 '%@' 到 %@ 将在 %d 天后开始！";
+
+// Support
+"Support" = "支持";
+"Help" = "帮助";
+"Send Feedback" = "发送反馈";
+"Terms of Service" = "服务条款";
+"Privacy Policy" = "隐私政策";
+"Help & Support" = "帮助和支持";
+"Last Updated: October 2025" = "最后更新：2025年10月";
+
+// Language names
+"English" = "英语";
+"Spanish" = "西班牙语";
+"French" = "法语";
+"German" = "德语";
+"Italian" = "意大利语";
+"Portuguese" = "葡萄牙语";
+"Chinese" = "中文";
+"Japanese" = "日语";
+"Korean" = "韩语";
+

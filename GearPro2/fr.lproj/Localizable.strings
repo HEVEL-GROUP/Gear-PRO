@@ -1,0 +1,110 @@
+/* 
+  Localizable.strings
+  GearPro2 - French
+
+  Created by Austin Norville on 10/21/25.
+*/
+
+// Navigation
+"Dashboard" = "Tableau de bord";
+"Trips" = "Voyages";
+"Gear Library" = "Bibliothèque d'équipement";
+"Meal Planning" = "Planification des repas";
+"Packing" = "Emballage";
+"Settings" = "Paramètres";
+
+// Settings
+"Account" = "Compte";
+"Edit Profile" = "Modifier le profil";
+"Personal Information" = "Informations personnelles";
+"First Name" = "Prénom";
+"Last Name" = "Nom";
+"Email" = "Email";
+"Save" = "Enregistrer";
+"Cancel" = "Annuler";
+
+"Preferences" = "Préférences";
+"Push Notifications" = "Notifications push";
+"Trip Reminders" = "Rappels de voyage";
+"Days ahead" = "Jours à l'avance";
+"You'll receive notifications for upcoming trips" = "Vous recevrez des notifications pour les voyages à venir";
+"Enable notifications to get reminders about upcoming trips" = "Activez les notifications pour recevoir des rappels sur les voyages à venir";
+"Status" = "Statut";
+"Test Notification" = "Tester la notification";
+"Test Permission Request" = "Tester la demande d'autorisation";
+"Enable" = "Activer";
+
+"Language" = "Langue";
+"Dark Mode" = "Mode sombre";
+
+"Data Storage" = "Stockage des données";
+"Storage Mode" = "Mode de stockage";
+"Apple Cloud" = "Apple Cloud";
+"Offline Only" = "Hors ligne uniquement";
+
+"Account Actions" = "Actions du compte";
+"Logout" = "Se déconnecter";
+"Delete Account" = "Supprimer le compte";
+"Are you sure you want to logout?" = "Êtes-vous sûr de vouloir vous déconnecter?";
+"This will permanently delete your account and all data. This action cannot be undone." = "Cela supprimera définitivement votre compte et toutes les données. Cette action ne peut pas être annulée.";
+
+// Trip related
+"Add Trip" = "Ajouter un voyage";
+"Trip Name" = "Nom du voyage";
+"Location" = "Emplacement";
+"Start Date" = "Date de début";
+"End Date" = "Date de fin";
+"Trip Status" = "Statut du voyage";
+"Planned" = "Planifié";
+"In Progress" = "En cours";
+"Completed" = "Terminé";
+"Cancelled" = "Annulé";
+
+// Gear related
+"Add Gear" = "Ajouter de l'équipement";
+"Gear Name" = "Nom de l'équipement";
+"Category" = "Catégorie";
+"Weight" = "Poids";
+"Essential" = "Essentiel";
+"Optional" = "Optionnel";
+
+// Meal related
+"Add Meal" = "Ajouter un repas";
+"Meal Name" = "Nom du repas";
+"Servings" = "Portions";
+"Calories per Serving" = "Calories par portion";
+
+// Common actions
+"Add" = "Ajouter";
+"Edit" = "Modifier";
+"Delete" = "Supprimer";
+"Done" = "Terminé";
+"Back" = "Retour";
+"Next" = "Suivant";
+"Previous" = "Précédent";
+
+// Notifications
+"Test Trip Reminder" = "Rappel de voyage test";
+"This is a test notification! Your notification system is working correctly." = "Ceci est une notification de test! Votre système de notification fonctionne correctement.";
+"Your trip '%@' to %@ starts in %d day(s)!" = "Votre voyage '%@' à %@ commence dans %d jour(s)!";
+
+// Support
+"Support" = "Support";
+"Help" = "Aide";
+"Send Feedback" = "Envoyer des commentaires";
+"Terms of Service" = "Conditions d'utilisation";
+"Privacy Policy" = "Politique de confidentialité";
+"Help & Support" = "Aide et support";
+"Last Updated: October 2025" = "Dernière mise à jour : Octobre 2025";
+
+// Language names
+"English" = "Anglais";
+"Spanish" = "Espagnol";
+"French" = "Français";
+"German" = "Allemand";
+"Italian" = "Italien";
+"Portuguese" = "Portugais";
+"Chinese" = "Chinois";
+"Japanese" = "Japonais";
+"Korean" = "Coréen";
+

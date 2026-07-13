@@ -1,0 +1,110 @@
+/* 
+  Localizable.strings
+  GearPro2 - Korean
+
+  Created by Austin Norville on 10/21/25.
+*/
+
+// Navigation
+"Dashboard" = "대시보드";
+"Trips" = "여행";
+"Gear Library" = "장비 라이브러리";
+"Meal Planning" = "식사 계획";
+"Packing" = "짐싸기";
+"Settings" = "설정";
+
+// Settings
+"Account" = "계정";
+"Edit Profile" = "프로필 편집";
+"Personal Information" = "개인 정보";
+"First Name" = "이름";
+"Last Name" = "성";
+"Email" = "이메일";
+"Save" = "저장";
+"Cancel" = "취소";
+
+"Preferences" = "환경설정";
+"Push Notifications" = "푸시 알림";
+"Trip Reminders" = "여행 알림";
+"Days ahead" = "며칠 전";
+"You'll receive notifications for upcoming trips" = "다가오는 여행에 대한 알림을 받게 됩니다";
+"Enable notifications to get reminders about upcoming trips" = "다가오는 여행에 대한 알림을 받으려면 알림을 활성화하세요";
+"Status" = "상태";
+"Test Notification" = "테스트 알림";
+"Test Permission Request" = "권한 요청 테스트";
+"Enable" = "활성화";
+
+"Language" = "언어";
+"Dark Mode" = "다크 모드";
+
+"Data Storage" = "데이터 저장";
+"Storage Mode" = "저장 모드";
+"Apple Cloud" = "Apple 클라우드";
+"Offline Only" = "오프라인만";
+
+"Account Actions" = "계정 작업";
+"Logout" = "로그아웃";
+"Delete Account" = "계정 삭제";
+"Are you sure you want to logout?" = "정말 로그아웃하시겠습니까?";
+"This will permanently delete your account and all data. This action cannot be undone." = "계정과 모든 데이터가 영구적으로 삭제됩니다. 이 작업은 취소할 수 없습니다.";
+
+// Trip related
+"Add Trip" = "여행 추가";
+"Trip Name" = "여행 이름";
+"Location" = "위치";
+"Start Date" = "시작 날짜";
+"End Date" = "종료 날짜";
+"Trip Status" = "여행 상태";
+"Planned" = "계획됨";
+"In Progress" = "진행 중";
+"Completed" = "완료됨";
+"Cancelled" = "취소됨";
+
+// Gear related
+"Add Gear" = "장비 추가";
+"Gear Name" = "장비 이름";
+"Category" = "카테고리";
+"Weight" = "무게";
+"Essential" = "필수";
+"Optional" = "선택";
+
+// Meal related
+"Add Meal" = "식사 추가";
+"Meal Name" = "식사 이름";
+"Servings" = "인분";
+"Calories per Serving" = "1인분당 칼로리";
+
+// Common actions
+"Add" = "추가";
+"Edit" = "편집";
+"Delete" = "삭제";
+"Done" = "완료";
+"Back" = "뒤로";
+"Next" = "다음";
+"Previous" = "이전";
+
+// Notifications
+"Test Trip Reminder" = "테스트 여행 알림";
+"This is a test notification! Your notification system is working correctly." = "테스트 알림입니다! 알림 시스템이 정상적으로 작동하고 있습니다.";
+"Your trip '%@' to %@ starts in %d day(s)!" = "'%@'에서 %@까지의 여행이 %d일 후에 시작됩니다!";
+
+// Support
+"Support" = "지원";
+"Help" = "도움말";
+"Send Feedback" = "피드백 보내기";
+"Terms of Service" = "서비스 약관";
+"Privacy Policy" = "개인정보 보호정책";
+"Help & Support" = "도움말 및 지원";
+"Last Updated: October 2025" = "마지막 업데이트: 2025년 10월";
+
+// Language names
+"English" = "영어";
+"Spanish" = "스페인어";
+"French" = "프랑스어";
+"German" = "독일어";
+"Italian" = "이탈리아어";
+"Portuguese" = "포르투갈어";
+"Chinese" = "중국어";
+"Japanese" = "일본어";
+"Korean" = "한국어";
+
