@@ -1,15 +1,17 @@
 :root {
-  --bg-base: #1c2b1f;
-  --bg-surface: #ffffff;
-  --bg-elevated: #1c2b1f;
-  --bg-soft: #f5f3ee;
-  --text-primary: #2c2c2a;
-  --text-secondary: #7a9e7e;
-  --brand: #c9925a;
-  --brand-strong: #c9925a;
-  --accent: #5b8a60;
-  --danger: #c62828;
-  --border: #3a5a3e;
+  /* Gear Pro brand palette — Sage primary, Cream ground, Ink text/dark, Terracotta alert */
+  --bg-base: #201e1d;      /* ink — dark surfaces */
+  --bg-surface: #ffffff;   /* cards on the cream ground */
+  --bg-elevated: #201e1d;
+  --bg-soft: #f5ead8;      /* cream — the ground */
+  --text-primary: #201e1d; /* ink */
+  --text-secondary: #8a9668; /* muted sage */
+  --brand: #7a8a5e;        /* sage — primary */
+  --brand-strong: #67754e; /* darker sage — hover/emphasis */
+  --accent: #7a8a5e;       /* sage */
+  --danger: #c62828;       /* destructive (delete) */
+  --alert: #c67139;        /* terracotta — alerts / overdue / expired */
+  --border: #e6dcc6;       /* warm neutral border */
 
   --space-1: 0.35rem;
   --space-2: 0.55rem;
@@ -28,8 +30,8 @@
 
 body {
   margin: 0;
-  font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #f5f3ee;
+  font-family: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f5ead8;
   color: var(--text-primary);
 }
 

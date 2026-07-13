@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="110" viewBox="0 0 500 110">
+<path d="M6 82 L34 34 L46 54 L58 34 L86 82 Z" fill="#f5ead8"></path>
+<path d="M28 70 L38 80 L58 54" stroke="#7a8a5e" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"></path>
+<text x="100" y="70" font-family="Caprasimo, Georgia, serif" font-size="46" fill="#f5ead8">Gear Pro</text>
+</svg>

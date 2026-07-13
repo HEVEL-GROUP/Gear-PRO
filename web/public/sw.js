@@ -1,14 +1,14 @@
-const CACHE_NAME = 'gear-pro-cache-v6'
+const CACHE_NAME = 'gear-pro-cache-v7'
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './favicon.svg',
-  './gear-pro-icon.svg',
-  './gear-pro-logo.svg',
-  './apple-touch-icon.png',
-  './icons/pwa-192.png',
-  './icons/pwa-512.png',
+  './logo-icon-sage.svg',
+  './logo-lockup-horizontal.svg',
+  './logo-lockup-horizontal.png',
+  './app-icon-180.png',
+  './app-icon-192.png',
+  './app-icon-512.png',
 ]
 
 self.addEventListener('install', (event) => {

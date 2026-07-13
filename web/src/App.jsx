@@ -5,7 +5,7 @@ const STORAGE_KEY = 'gearpro2.web.state.v2'
 const STATUS_OPTIONS = ['reserved', 'checked_out', 'returned', 'needs_repair', 'consumed', 'lost']
 const CHECKED_IN_STATUSES = ['returned', 'needs_repair', 'consumed', 'lost']
 const NOT_CHECKED_IN_STATUSES = ['reserved', 'checked_out']
-const BAG_COLOR_PALETTE = ['#1565c0', '#2e7d42', '#c98a1a', '#c62828', '#5b8a60', '#7a9e7e', '#c9925a']
+const BAG_COLOR_PALETTE = ['#1565c0', '#2e7d42', '#c98a1a', '#c62828', '#5b8a60', '#7a8a5e', '#c67139']
 const STARTER_CATEGORIES = ['Shelter', 'Sleep', 'Cooking', 'Water', 'Clothing', 'Safety', 'Navigation', 'Food', 'Tools', 'Hunting', 'Other']
 const DEFAULT_PACK_TEMPLATES = [
   { id: crypto.randomUUID(), label: 'My Pack', maxWeight: 45, color: '#2e7d42' },
@@ -1245,7 +1245,7 @@ function App() {
     <main className="app-shell">
       <header className="topbar">
         <div className="hero-brand">
-          <img src={`${import.meta.env.BASE_URL}gear-pro-logo.svg`} alt="Gear Pro logo" className="hero-logo-wide" />
+          <img src={`${import.meta.env.BASE_URL}logo-lockup-horizontal.png`} alt="Gear Pro" className="hero-logo-wide" />
           <div>
             <p className="type-body">Plan and track hunting, backpacking, and hiking gear from check-out to check-in.</p>
           </div>
