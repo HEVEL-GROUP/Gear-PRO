@@ -1,10 +1,10 @@
-name: Deploy GearPro2 Web
+name: Deploy Gear Pro web
 
 on:
   push:
     branches: ["main"]
     paths:
-      - "web/**"
+      - "gearpro/**"
       - ".github/workflows/deploy-web.yml"
   workflow_dispatch:
 
@@ -29,15 +29,19 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: "web/package-lock.json"
+          cache-dependency-path: "gearpro/package-lock.json"
 
       - name: Install dependencies
         run: npm ci
-        working-directory: web
+        working-directory: gearpro
 
-      - name: Build static site
-        run: npm run build -- --base="/${{ github.event.repository.name }}/"
-        working-directory: web
+      - name: Export web build
+        run: npx expo export -p web
+        working-directory: gearpro
+
+      - name: Add SPA fallback for deep links
+        run: cp dist/index.html dist/404.html
+        working-directory: gearpro
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -47,7 +51,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: web/dist
+          path: gearpro/dist
 
   deploy:
     needs: build
