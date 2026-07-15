@@ -61,6 +61,8 @@ export const STATUS_ORDER: GearStatus[] = [
   'lost',
 ];
 
+export const BAG_COLORS = ['#7a8a5e', '#4a5334', '#c67139', '#5b7fa6', '#8a6d9e', '#6f6a60'];
+
 export const CATEGORIES = [
   'Shelter',
   'Sleep',
@@ -107,33 +109,32 @@ const seedGear: GearItem[] = [
 const myPack = (): Bag => ({ id: uid(), label: 'My Pack', maxWeightLb: 45, color: '#7a8a5e' });
 
 function seedTrips(): Trip[] {
-  const bagA = myPack();
-  const packed = (gearId: string, quantity = 1, essential = false): Assignment => ({
-    id: uid(),
-    gearId,
-    bagId: bagA.id,
-    quantity,
-    status: 'checked_out',
-    essential,
-  });
+  const bagA: Bag = { id: uid(), label: 'My Pack', maxWeightLb: 45, color: '#7a8a5e' };
+  const bagB: Bag = { id: uid(), label: 'Day Pack', maxWeightLb: 18, color: '#c67139' };
+  const pk = (
+    bagId: string,
+    gearId: string,
+    quantity = 1,
+    essential = false,
+  ): Assignment => ({ id: uid(), gearId, bagId, quantity, status: 'checked_out', essential });
   const elk: Trip = {
     id: 'elk',
     name: 'Elk Season · Bighorns',
     location: 'Bighorn Mountains, WY',
     startDate: '2026-10-12',
     endDate: '2026-10-16',
-    bags: [bagA],
+    bags: [bagA, bagB],
     assignments: [
-      packed('tent', 1, true),
-      packed('bag', 1, true),
-      packed('pad', 1),
-      packed('stove', 1),
-      packed('pot', 1),
-      packed('filter', 1, true),
-      packed('firstaid', 1, true),
-      packed('optics', 1),
-      packed('rangefinder', 1),
-      packed('layers', 1),
+      pk(bagA.id, 'tent', 1, true),
+      pk(bagA.id, 'bag', 1, true),
+      pk(bagA.id, 'pad', 1),
+      pk(bagA.id, 'stove', 1),
+      pk(bagA.id, 'pot', 1),
+      pk(bagA.id, 'filter', 1, true),
+      pk(bagA.id, 'layers', 1),
+      pk(bagB.id, 'optics', 1),
+      pk(bagB.id, 'rangefinder', 1),
+      pk(bagB.id, 'firstaid', 1, true),
     ],
   };
   const scout: Trip = {
@@ -160,6 +161,9 @@ type StoreState = {
   addAssignment: (tripId: string, bagId: string, gearId: string, quantity?: number) => void;
   updateAssignment: (tripId: string, assignmentId: string, patch: Partial<Assignment>) => void;
   removeAssignment: (tripId: string, assignmentId: string) => void;
+  addBag: (tripId: string, bag: Omit<Bag, 'id'>) => void;
+  updateBag: (tripId: string, bagId: string, patch: Partial<Bag>) => void;
+  removeBag: (tripId: string, bagId: string) => void;
   resetSeed: () => void;
 };
 
@@ -220,6 +224,32 @@ export const useGearStore = create<StoreState>()(
             t.id !== tripId
               ? t
               : { ...t, assignments: t.assignments.filter((a) => a.id !== assignmentId) },
+          ),
+        })),
+      addBag: (tripId, bag) =>
+        set((s) => ({
+          trips: s.trips.map((t) =>
+            t.id !== tripId ? t : { ...t, bags: [...t.bags, { ...bag, id: uid() }] },
+          ),
+        })),
+      updateBag: (tripId, bagId, patch) =>
+        set((s) => ({
+          trips: s.trips.map((t) =>
+            t.id !== tripId
+              ? t
+              : { ...t, bags: t.bags.map((b) => (b.id === bagId ? { ...b, ...patch } : b)) },
+          ),
+        })),
+      removeBag: (tripId, bagId) =>
+        set((s) => ({
+          trips: s.trips.map((t) =>
+            t.id !== tripId
+              ? t
+              : {
+                  ...t,
+                  bags: t.bags.filter((b) => b.id !== bagId),
+                  assignments: t.assignments.filter((a) => a.bagId !== bagId),
+                },
           ),
         })),
       resetSeed: () => set({ gear: seedGear, trips: seedTrips(), categories: CATEGORIES }),

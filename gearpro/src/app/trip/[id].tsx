@@ -3,8 +3,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { BagFormSheet } from '@/components/BagFormSheet';
 import { Sheet } from '@/components/form';
-import { Card, Chip, Display, Eyebrow, Screen } from '@/components/ui';
+import { Card, Chip, Display, Screen } from '@/components/ui';
 import { WeightRing } from '@/components/WeightRing';
 import { tapLight, tapSuccess } from '@/lib/haptics';
 import { font, useTheme } from '@/theme/tokens';
@@ -46,6 +47,10 @@ export default function TripDetail() {
 
   const [assignBagId, setAssignBagId] = useState<string | null>(null);
   const [statusFor, setStatusFor] = useState<string | null>(null);
+  const [bagEdit, setBagEdit] = useState<{ open: boolean; bagId: string | null }>({
+    open: false,
+    bagId: null,
+  });
 
   if (!trip) {
     return (
@@ -63,6 +68,10 @@ export default function TripDetail() {
   const total = tripWeight(trip, byId);
   const target = bagTarget(trip);
   const statusForAssignment = trip.assignments.find((a) => a.id === statusFor);
+  const bagWeight = (bagId: string) =>
+    trip.assignments
+      .filter((a) => a.bagId === bagId)
+      .reduce((sum, a) => sum + (byId[a.gearId]?.weightLb ?? 0) * a.quantity, 0);
 
   return (
     <Screen>
@@ -91,30 +100,69 @@ export default function TripDetail() {
           <WeightRing value={total} target={target} />
           <View style={{ flex: 1, gap: 12 }}>
             <Stat label="Pack weight" value={`${total.toFixed(1)} lb`} color={t.text} />
-            <Stat label="Target" value={`${target} lb`} color={t.primary} />
-            <Stat label="Items" value={`${itemCount(trip)}`} color={t.text} />
+            <Stat label="Total capacity" value={`${target} lb`} color={t.primary} />
+            <Stat label={`${trip.bags.length} bags · items`} value={`${itemCount(trip)}`} color={t.text} />
           </View>
         </View>
       </Card>
+
+      {trip.bags.length > 1 && total > 0 ? (
+        <View style={{ marginTop: 16 }}>
+          <SectionLabel>Load by bag</SectionLabel>
+          <View style={{ height: 14, borderRadius: 999, overflow: 'hidden', flexDirection: 'row', backgroundColor: t.track }}>
+            {trip.bags.map((bag) => {
+              const w = bagWeight(bag.id);
+              return w > 0 ? (
+                <View key={bag.id} style={{ width: `${(w / total) * 100}%`, backgroundColor: bag.color }} />
+              ) : null;
+            })}
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 10 }}>
+            {trip.bags.map((bag) => (
+              <View key={bag.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: bag.color }} />
+                <Text style={{ fontFamily: font.semibold, fontSize: 12, color: t.textMuted }}>
+                  {bag.label} · {bagWeight(bag.id).toFixed(1)} lb
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       <View style={{ height: 16 }} />
 
       {trip.bags.map((bag) => {
         const items = trip.assignments.filter((a) => a.bagId === bag.id);
-        const bagW = items.reduce((sum, a) => sum + (byId[a.gearId]?.weightLb ?? 0) * a.quantity, 0);
+        const bagW = bagWeight(bag.id);
+        const over = bagW > bag.maxWeightLb;
         return (
           <View key={bag.id} style={{ marginBottom: 18 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: bag.color, marginRight: 8 }} />
+            <Pressable
+              onPress={() => setBagEdit({ open: true, bagId: bag.id })}
+              style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+              <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: bag.color, marginRight: 8 }} />
               <Text style={{ fontFamily: font.bold, fontSize: 16, color: t.text, flex: 1 }}>{bag.label}</Text>
-              <Text style={{ fontFamily: font.semibold, fontSize: 13, color: t.textMuted }}>
+              <Text style={{ fontFamily: font.semibold, fontSize: 13, color: over ? t.alert : t.textMuted, marginRight: 6 }}>
                 {bagW.toFixed(1)} / {bag.maxWeightLb} lb
               </Text>
+              <Ionicons name="ellipsis-horizontal" size={18} color={t.textMuted} />
+            </Pressable>
+
+            <View style={{ height: 6, borderRadius: 999, backgroundColor: t.track, overflow: 'hidden', marginBottom: 12 }}>
+              <View
+                style={{
+                  height: 6,
+                  borderRadius: 999,
+                  width: `${Math.min(100, bag.maxWeightLb > 0 ? (bagW / bag.maxWeightLb) * 100 : 0)}%`,
+                  backgroundColor: over ? t.alert : bag.color,
+                }}
+              />
             </View>
 
             {items.length === 0 ? (
               <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginBottom: 8, paddingLeft: 2 }}>
-                Nothing packed yet.
+                Nothing packed in this bag yet.
               </Text>
             ) : (
               items.map((a) => {
@@ -166,6 +214,22 @@ export default function TripDetail() {
           </View>
         );
       })}
+
+      <Pressable onPress={() => setBagEdit({ open: true, bagId: null })}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            borderRadius: 14,
+            backgroundColor: t.soft,
+            paddingVertical: 14,
+          }}>
+          <Ionicons name="add" size={18} color={t.softText} />
+          <Text style={{ fontFamily: font.bold, color: t.softText, fontSize: 14 }}>Add another bag</Text>
+        </View>
+      </Pressable>
 
       <Sheet visible={!!assignBagId} onClose={() => setAssignBagId(null)} title="Add gear">
         {gear.map((item) => {
@@ -219,7 +283,31 @@ export default function TripDetail() {
           );
         })}
       </Sheet>
+
+      <BagFormSheet
+        visible={bagEdit.open}
+        tripId={trip.id}
+        editBagId={bagEdit.bagId}
+        onClose={() => setBagEdit({ open: false, bagId: null })}
+      />
     </Screen>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  const t = useTheme();
+  return (
+    <Text
+      style={{
+        fontFamily: font.bold,
+        fontSize: 12,
+        color: t.softText,
+        marginBottom: 8,
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+      }}>
+      {children}
+    </Text>
   );
 }
 
