@@ -162,6 +162,7 @@ type StoreState = {
   updateAssignment: (tripId: string, assignmentId: string, patch: Partial<Assignment>) => void;
   removeAssignment: (tripId: string, assignmentId: string) => void;
   moveAssignment: (tripId: string, assignmentId: string, toBagId: string) => void;
+  returnTrip: (tripId: string) => void;
   addBag: (tripId: string, bag: Omit<Bag, 'id'>) => void;
   updateBag: (tripId: string, bagId: string, patch: Partial<Bag>) => void;
   removeBag: (tripId: string, bagId: string) => void;
@@ -254,6 +255,19 @@ export const useGearStore = create<StoreState>()(
             };
           }),
         })),
+      returnTrip: (tripId) =>
+        set((s) => ({
+          trips: s.trips.map((t) =>
+            t.id !== tripId
+              ? t
+              : {
+                  ...t,
+                  assignments: t.assignments.map((a) =>
+                    a.status === 'checked_out' ? { ...a, status: 'returned' as GearStatus } : a,
+                  ),
+                },
+          ),
+        })),
       addBag: (tripId, bag) =>
         set((s) => ({
           trips: s.trips.map((t) =>
@@ -322,4 +336,33 @@ export function bagTarget(trip: Trip): number {
 
 export function itemCount(trip: Trip): number {
   return trip.assignments.reduce((sum, a) => sum + a.quantity, 0);
+}
+
+export type TripLifecycle = 'upcoming' | 'active' | 'needs_return' | 'closed';
+
+// Derived, not stored — so it's never out of sync with dates or item statuses.
+export function tripLifecycle(trip: Trip, todayStamp: string): TripLifecycle {
+  const hasPackedItems = trip.assignments.some((a) => a.status === 'checked_out');
+  const hasAssignments = trip.assignments.length > 0;
+  const isOver = trip.endDate ? trip.endDate < todayStamp : false;
+
+  if (isOver) {
+    return hasPackedItems ? 'needs_return' : 'closed';
+  }
+  if (trip.startDate && trip.startDate <= todayStamp) {
+    return hasPackedItems || hasAssignments ? 'active' : 'upcoming';
+  }
+  return 'upcoming';
+}
+
+export function todayStamp(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Counts units (matches itemCount's convention), not assignment rows.
+export function packedCount(trip: Trip): number {
+  return trip.assignments
+    .filter((a) => a.status === 'checked_out')
+    .reduce((sum, a) => sum + a.quantity, 0);
 }

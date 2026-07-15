@@ -14,8 +14,12 @@ import {
   GearStatus,
   gearMap,
   itemCount,
+  packedCount,
   STATUS_LABELS,
   STATUS_ORDER,
+  todayStamp,
+  TripLifecycle,
+  tripLifecycle,
   tripWeight,
   useGearStore,
 } from '@/store/useGearStore';
@@ -30,6 +34,13 @@ const statusTone = (s: GearStatus): ChipTone =>
         ? 'neutral'
         : 'alert';
 
+const LIFECYCLE_META: Record<TripLifecycle, { label: string; tone: ChipTone }> = {
+  needs_return: { label: 'Needs return', tone: 'alert' },
+  active: { label: 'Active', tone: 'solid' },
+  upcoming: { label: 'Upcoming', tone: 'sage' },
+  closed: { label: 'Closed', tone: 'neutral' },
+};
+
 export default function TripDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -41,6 +52,7 @@ export default function TripDetail() {
   const updateAssignment = useGearStore((s) => s.updateAssignment);
   const removeAssignment = useGearStore((s) => s.removeAssignment);
   const moveAssignment = useGearStore((s) => s.moveAssignment);
+  const returnTrip = useGearStore((s) => s.returnTrip);
   const removeTrip = useGearStore((s) => s.removeTrip);
 
   const byId = useMemo(() => gearMap(gear), [gear]);
@@ -69,6 +81,9 @@ export default function TripDetail() {
 
   const total = tripWeight(trip, byId);
   const target = bagTarget(trip);
+  const today = todayStamp();
+  const lifecycle = tripLifecycle(trip, today);
+  const packed = packedCount(trip);
   const statusForAssignment = trip.assignments.find((a) => a.id === statusFor);
   const bagWeight = (bagId: string) =>
     trip.assignments
@@ -87,15 +102,62 @@ export default function TripDetail() {
             {trip.location || 'No location'}
           </Text>
         </View>
+        <Chip label={LIFECYCLE_META[lifecycle].label} tone={LIFECYCLE_META[lifecycle].tone} />
         <Pressable
           onPress={() => {
             removeTrip(trip.id);
             router.back();
           }}
-          hitSlop={12}>
+          hitSlop={12}
+          style={{ marginLeft: 10 }}>
           <Ionicons name="trash-outline" size={20} color={t.textMuted} />
         </Pressable>
       </View>
+
+      {packed > 0 ? (
+        <Pressable
+          onPress={() => {
+            returnTrip(trip.id);
+            tapSuccess();
+          }}
+          style={{ marginBottom: 16 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+              backgroundColor: lifecycle === 'needs_return' ? t.alertSoft : t.soft,
+              borderRadius: 14,
+              padding: 14,
+            }}>
+            <Ionicons
+              name="arrow-undo-circle-outline"
+              size={22}
+              color={lifecycle === 'needs_return' ? t.alertText : t.softText}
+            />
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontFamily: font.bold,
+                  fontSize: 14,
+                  color: lifecycle === 'needs_return' ? t.alertText : t.softText,
+                }}>
+                {lifecycle === 'needs_return' ? "Trip's over — check gear back in" : 'Return trip'}
+              </Text>
+              <Text
+                style={{
+                  fontFamily: font.medium,
+                  fontSize: 12,
+                  color: lifecycle === 'needs_return' ? t.alertText : t.textMuted,
+                  marginTop: 1,
+                }}>
+                Marks {packed} packed item{packed === 1 ? '' : 's'} as returned
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={lifecycle === 'needs_return' ? t.alertText : t.softText} />
+          </View>
+        </Pressable>
+      ) : null}
 
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>

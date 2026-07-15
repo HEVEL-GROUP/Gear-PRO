@@ -14,6 +14,11 @@ import {
   categoryBreakdown,
   gearMap,
   itemCount,
+  packedCount,
+  todayStamp,
+  Trip,
+  TripLifecycle,
+  tripLifecycle,
   tripWeight,
   useGearStore,
 } from '@/store/useGearStore';
@@ -26,6 +31,18 @@ const fmtRange = (a: string, b: string) => {
   return `${d(a)} – ${d(b)}`;
 };
 
+const LIFECYCLE_META: Record<TripLifecycle, { label: string; tone: 'alert' | 'solid' | 'sage' | 'neutral' }> = {
+  needs_return: { label: 'Needs return', tone: 'alert' },
+  active: { label: 'Active', tone: 'solid' },
+  upcoming: { label: 'Upcoming', tone: 'sage' },
+  closed: { label: 'Closed', tone: 'neutral' },
+};
+
+function LifecycleChip({ trip, today }: { trip: Trip; today: string }) {
+  const meta = LIFECYCLE_META[tripLifecycle(trip, today)];
+  return <Chip label={meta.label} tone={meta.tone} />;
+}
+
 export default function TripsScreen() {
   const t = useTheme();
   const router = useRouter();
@@ -34,8 +51,15 @@ export default function TripsScreen() {
   const byId = useMemo(() => gearMap(gear), [gear]);
   const [tripModal, setTripModal] = useState(false);
 
-  const featured = trips[0];
-  const rest = trips.slice(1);
+  const today = todayStamp();
+  // Surface a trip that needs return first — that's the one that actually needs attention.
+  const sorted = useMemo(() => {
+    const priority: Record<TripLifecycle, number> = { needs_return: 0, active: 1, upcoming: 2, closed: 3 };
+    return [...trips].sort((a, b) => priority[tripLifecycle(a, today)] - priority[tripLifecycle(b, today)]);
+  }, [trips, today]);
+  const featured = sorted[0];
+  const rest = sorted.slice(1);
+  const featuredLifecycle = featured ? tripLifecycle(featured, today) : 'upcoming';
   const barColors = [t.primary, t.primaryDark, t.sageMuted];
 
   return (
@@ -70,10 +94,12 @@ export default function TripsScreen() {
               target={bagTarget(featured)}
               bags={featured.bags.length}
               items={itemCount(featured)}
+              packed={packedCount(featured)}
               name={featured.name}
               range={fmtRange(featured.startDate, featured.endDate)}
               breakdown={categoryBreakdown(featured, byId).slice(0, 3)}
               barColors={barColors}
+              lifecycle={featuredLifecycle}
             />
           </Touchable>
         </Animated.View>
@@ -101,6 +127,9 @@ export default function TripsScreen() {
               <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
                 {trip.location} · {fmtRange(trip.startDate, trip.endDate)}
               </Text>
+              <View style={{ marginTop: 6, alignSelf: 'flex-start' }}>
+                <LifecycleChip trip={trip} today={today} />
+              </View>
             </View>
             <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.primary }}>
               {tripWeight(trip, byId).toFixed(1)} lb
@@ -138,21 +167,31 @@ export default function TripsScreen() {
   );
 }
 
+const FEATURED_EYEBROW: Record<TripLifecycle, string> = {
+  needs_return: 'NEEDS RETURN',
+  active: 'ACTIVE NOW',
+  upcoming: 'NEXT UP',
+  closed: 'CLOSED',
+};
+
 function FeaturedCard(props: {
   weight: number;
   target: number;
   bags: number;
   items: number;
+  packed: number;
   name: string;
   range: string;
   breakdown: { category: string; weight: number }[];
   barColors: string[];
+  lifecycle: TripLifecycle;
 }) {
   const t = useTheme();
   const maxCat = Math.max(...props.breakdown.map((b) => b.weight), 1);
+  const eyebrowColor = props.lifecycle === 'needs_return' ? t.alert : t.primary;
   return (
     <Card>
-      <Eyebrow color={t.alert}>{`NEXT UP · ${props.range}`}</Eyebrow>
+      <Eyebrow color={eyebrowColor}>{`${FEATURED_EYEBROW[props.lifecycle]} · ${props.range}`}</Eyebrow>
       <Display style={{ marginTop: 4, marginBottom: 14 }}>{props.name}</Display>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
@@ -184,7 +223,15 @@ function FeaturedCard(props: {
       <View style={{ flexDirection: 'row', gap: 7, marginTop: 16, flexWrap: 'wrap' }}>
         <Chip label={`${props.bags} bags`} tone="sage" icon={<Ionicons name="briefcase-outline" size={13} color={t.softText} />} />
         <Chip label={`${props.items} items`} tone="sage" />
-        <Chip label="Essentials ready" tone="solid" icon={<Ionicons name="checkmark" size={13} color={t.onPrimary} />} />
+        {props.lifecycle === 'needs_return' ? (
+          <Chip
+            label={`${props.packed} to check in`}
+            tone="alert"
+            icon={<Ionicons name="arrow-undo-outline" size={13} color={t.alertText} />}
+          />
+        ) : (
+          <Chip label={`${props.packed} packed`} tone="solid" icon={<Ionicons name="checkmark" size={13} color={t.onPrimary} />} />
+        )}
       </View>
     </Card>
   );
