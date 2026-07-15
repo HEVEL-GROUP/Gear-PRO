@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { Display } from '@/components/ui';
+import { tapLight } from '@/lib/haptics';
 import { font, useTheme } from '@/theme/tokens';
 
 export function Sheet({
@@ -178,7 +179,12 @@ export function Button({
   const fg = tone === 'primary' ? t.onPrimary : tone === 'danger' ? t.alert : t.text;
   const borderColor = tone === 'danger' ? t.alert : t.border;
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
+    <Pressable
+      onPress={() => {
+        tapLight();
+        onPress();
+      }}
+      style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] })}>
       <View
         style={{
           flexDirection: 'row',

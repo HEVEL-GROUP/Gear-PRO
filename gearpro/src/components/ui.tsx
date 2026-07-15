@@ -1,7 +1,8 @@
 import { ReactNode } from 'react';
-import { ScrollView, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextStyle, View, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { tapLight } from '@/lib/haptics';
 import { font, radius, useTheme } from '@/theme/tokens';
 
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
@@ -28,11 +29,48 @@ export function Card({ children, style }: { children: ReactNode; style?: ViewSty
   return (
     <View
       style={[
-        { backgroundColor: t.surface, borderRadius: 18, borderWidth: 1, borderColor: t.border, padding: 16 },
+        {
+          backgroundColor: t.surface,
+          borderRadius: 18,
+          borderWidth: 1,
+          borderColor: t.border,
+          padding: 16,
+          shadowColor: '#201e1d',
+          shadowOpacity: t.mode === 'dark' ? 0.35 : 0.07,
+          shadowRadius: 14,
+          shadowOffset: { width: 0, height: 6 },
+          elevation: 2,
+        },
         style,
       ]}>
       {children}
     </View>
+  );
+}
+
+export function Touchable({
+  children,
+  onPress,
+  style,
+  haptics = true,
+}: {
+  children: ReactNode;
+  onPress?: () => void;
+  style?: ViewStyle;
+  haptics?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={() => {
+        if (haptics) tapLight();
+        onPress?.();
+      }}
+      style={({ pressed }) => [
+        { transform: [{ scale: pressed ? 0.975 : 1 }], opacity: pressed ? 0.94 : 1 },
+        style,
+      ]}>
+      {children}
+    </Pressable>
   );
 }
 

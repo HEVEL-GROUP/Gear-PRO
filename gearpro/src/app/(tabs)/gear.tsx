@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useMemo, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { GearFormModal } from '@/components/GearFormModal';
-import { Card, Chip, Display, Screen } from '@/components/ui';
+import { Card, Chip, Display, Screen, Touchable } from '@/components/ui';
 import { font, radius, useTheme } from '@/theme/tokens';
 import { useGearStore } from '@/store/useGearStore';
 
@@ -59,8 +60,9 @@ export default function GearScreen() {
         />
       </View>
 
-      {filtered.map((g) => (
-        <Pressable key={g.id} onPress={() => setModal({ open: true, editId: g.id })} style={{ marginBottom: 10 }}>
+      {filtered.map((g, i) => (
+        <Animated.View key={g.id} entering={FadeInDown.duration(320).delay(Math.min(i * 40, 400))} style={{ marginBottom: 10 }}>
+          <Touchable onPress={() => setModal({ open: true, editId: g.id })}>
           <Card style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             {g.photoUri ? (
               <Image
@@ -94,10 +96,11 @@ export default function GearScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
           </Card>
-        </Pressable>
+          </Touchable>
+        </Animated.View>
       ))}
 
-      <Pressable onPress={() => setModal({ open: true, editId: null })}>
+      <Touchable onPress={() => setModal({ open: true, editId: null })}>
         <View
           style={{
             flexDirection: 'row',
@@ -114,7 +117,7 @@ export default function GearScreen() {
           <Ionicons name="add" size={20} color={t.primary} />
           <Text style={{ fontFamily: font.bold, color: t.primary, fontSize: 15 }}>Add gear</Text>
         </View>
-      </Pressable>
+      </Touchable>
 
       <GearFormModal
         visible={modal.open}

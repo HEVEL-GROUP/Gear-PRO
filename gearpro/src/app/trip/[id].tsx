@@ -6,6 +6,7 @@ import { Pressable, Text, View } from 'react-native';
 import { Sheet } from '@/components/form';
 import { Card, Chip, Display, Eyebrow, Screen } from '@/components/ui';
 import { WeightRing } from '@/components/WeightRing';
+import { tapLight, tapSuccess } from '@/lib/haptics';
 import { font, useTheme } from '@/theme/tokens';
 import {
   bagTarget,
@@ -173,7 +174,12 @@ export default function TripDetail() {
           return (
             <Pressable
               key={item.id}
-              onPress={() => assignBagId && addAssignment(trip.id, assignBagId, item.id, 1)}
+              onPress={() => {
+                if (assignBagId) {
+                  addAssignment(trip.id, assignBagId, item.id, 1);
+                  tapLight();
+                }
+              }}
               style={{ marginBottom: 8 }}>
               <Card style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View style={{ flex: 1 }}>
@@ -200,6 +206,7 @@ export default function TripDetail() {
               key={s}
               onPress={() => {
                 if (statusFor) updateAssignment(trip.id, statusFor, { status: s });
+                tapSuccess();
                 setStatusFor(null);
               }}
               style={{ marginBottom: 8 }}>
@@ -233,11 +240,11 @@ function Stepper({ qty, onDec, onInc }: { qty: number; onDec: () => void; onInc:
   const btn = { width: 30, height: 30, borderRadius: 8, alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: t.surfaceAlt, borderWidth: 1, borderColor: t.border };
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <Pressable onPress={onDec} style={btn}>
+      <Pressable onPress={() => { tapLight(); onDec(); }} style={btn}>
         <Ionicons name={qty <= 1 ? 'trash-outline' : 'remove'} size={16} color={t.text} />
       </Pressable>
       <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text, minWidth: 16, textAlign: 'center' }}>{qty}</Text>
-      <Pressable onPress={onInc} style={btn}>
+      <Pressable onPress={() => { tapLight(); onInc(); }} style={btn}>
         <Ionicons name="add" size={16} color={t.text} />
       </Pressable>
     </View>

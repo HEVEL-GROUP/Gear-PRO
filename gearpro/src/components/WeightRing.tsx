@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
@@ -11,8 +12,29 @@ export function WeightRing({ value, target, size = 108 }: Props) {
   const r = (size - stroke) / 2;
   const c = size / 2;
   const over = value > target;
-  const pct = Math.max(0, Math.min(0.9999, target > 0 ? value / target : 0));
+  const targetPct = Math.max(0, Math.min(0.9999, target > 0 ? value / target : 0));
   const color = over ? t.alert : t.primary;
+
+  const [pct, setPct] = useState(0);
+  const pctRef = useRef(0);
+  const raf = useRef(0);
+
+  useEffect(() => {
+    const from = pctRef.current;
+    const startT = Date.now();
+    const dur = 700;
+    const tick = () => {
+      const k = Math.min(1, (Date.now() - startT) / dur);
+      const eased = 1 - Math.pow(1 - k, 3);
+      const v = from + (targetPct - from) * eased;
+      pctRef.current = v;
+      setPct(v);
+      if (k < 1) raf.current = requestAnimationFrame(tick);
+    };
+    cancelAnimationFrame(raf.current);
+    raf.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf.current);
+  }, [targetPct]);
 
   const angle = pct * 2 * Math.PI;
   const endX = c + r * Math.sin(angle);
@@ -24,7 +46,7 @@ export function WeightRing({ value, target, size = 108 }: Props) {
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
         <Circle cx={c} cy={c} r={r} stroke={t.track} strokeWidth={stroke} fill="none" />
-        {pct > 0 ? (
+        {pct > 0.001 ? (
           <Path d={arc} stroke={color} strokeWidth={stroke} fill="none" strokeLinecap="round" />
         ) : null}
       </Svg>
