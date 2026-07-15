@@ -40,6 +40,7 @@ export default function TripDetail() {
   const addAssignment = useGearStore((s) => s.addAssignment);
   const updateAssignment = useGearStore((s) => s.updateAssignment);
   const removeAssignment = useGearStore((s) => s.removeAssignment);
+  const moveAssignment = useGearStore((s) => s.moveAssignment);
   const removeTrip = useGearStore((s) => s.removeTrip);
 
   const byId = useMemo(() => gearMap(gear), [gear]);
@@ -47,6 +48,7 @@ export default function TripDetail() {
 
   const [assignBagId, setAssignBagId] = useState<string | null>(null);
   const [statusFor, setStatusFor] = useState<string | null>(null);
+  const [moveFor, setMoveFor] = useState<string | null>(null);
   const [bagEdit, setBagEdit] = useState<{ open: boolean; bagId: string | null }>({
     open: false,
     bagId: null,
@@ -176,9 +178,31 @@ export default function TripDetail() {
                       <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
                         {item?.category} · {((item?.weightLb ?? 0) * a.quantity).toFixed(2)} lb
                       </Text>
-                      <Pressable onPress={() => setStatusFor(a.id)} style={{ marginTop: 8, alignSelf: 'flex-start' }}>
-                        <Chip label={STATUS_LABELS[a.status]} tone={statusTone(a.status)} />
-                      </Pressable>
+                      <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+                        <Pressable onPress={() => setStatusFor(a.id)}>
+                          <Chip label={STATUS_LABELS[a.status]} tone={statusTone(a.status)} />
+                        </Pressable>
+                        {trip.bags.length > 1 ? (
+                          <Pressable
+                            onPress={() => {
+                              tapLight();
+                              setMoveFor(a.id);
+                            }}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
+                              borderRadius: 999,
+                              paddingHorizontal: 10,
+                              paddingVertical: 4,
+                              borderWidth: 1,
+                              borderColor: t.border,
+                            }}>
+                            <Ionicons name="swap-horizontal" size={13} color={t.textMuted} />
+                            <Text style={{ fontFamily: font.semibold, fontSize: 12, color: t.textMuted }}>Move</Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
                     </View>
                     <Stepper
                       qty={a.quantity}
@@ -282,6 +306,46 @@ export default function TripDetail() {
             </Pressable>
           );
         })}
+      </Sheet>
+
+      <Sheet visible={!!moveFor} onClose={() => setMoveFor(null)} title="Move to bag">
+        {(() => {
+          const moving = trip.assignments.find((a) => a.id === moveFor);
+          if (!moving) return null;
+          const item = byId[moving.gearId];
+          return (
+            <>
+              <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginBottom: 14 }}>
+                {item ? `${item.brand} ${item.name}` : 'This item'} · currently in{' '}
+                {trip.bags.find((b) => b.id === moving.bagId)?.label ?? 'Unknown'}
+              </Text>
+              {trip.bags
+                .filter((b) => b.id !== moving.bagId)
+                .map((bag) => {
+                  const destW = bagWeight(bag.id);
+                  return (
+                    <Pressable
+                      key={bag.id}
+                      onPress={() => {
+                        moveAssignment(trip.id, moving.id, bag.id);
+                        tapSuccess();
+                        setMoveFor(null);
+                      }}
+                      style={{ marginBottom: 8 }}>
+                      <Card style={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: bag.color }} />
+                        <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text, flex: 1 }}>{bag.label}</Text>
+                        <Text style={{ fontFamily: font.semibold, fontSize: 12, color: t.textMuted }}>
+                          {destW.toFixed(1)} / {bag.maxWeightLb} lb
+                        </Text>
+                        <Ionicons name="arrow-forward-circle" size={22} color={t.primary} />
+                      </Card>
+                    </Pressable>
+                  );
+                })}
+            </>
+          );
+        })()}
       </Sheet>
 
       <BagFormSheet

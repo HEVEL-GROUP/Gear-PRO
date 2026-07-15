@@ -161,6 +161,7 @@ type StoreState = {
   addAssignment: (tripId: string, bagId: string, gearId: string, quantity?: number) => void;
   updateAssignment: (tripId: string, assignmentId: string, patch: Partial<Assignment>) => void;
   removeAssignment: (tripId: string, assignmentId: string) => void;
+  moveAssignment: (tripId: string, assignmentId: string, toBagId: string) => void;
   addBag: (tripId: string, bag: Omit<Bag, 'id'>) => void;
   updateBag: (tripId: string, bagId: string, patch: Partial<Bag>) => void;
   removeBag: (tripId: string, bagId: string) => void;
@@ -225,6 +226,33 @@ export const useGearStore = create<StoreState>()(
               ? t
               : { ...t, assignments: t.assignments.filter((a) => a.id !== assignmentId) },
           ),
+        })),
+      moveAssignment: (tripId, assignmentId, toBagId) =>
+        set((s) => ({
+          trips: s.trips.map((t) => {
+            if (t.id !== tripId) return t;
+            const moving = t.assignments.find((a) => a.id === assignmentId);
+            if (!moving || moving.bagId === toBagId) return t;
+            const existing = t.assignments.find(
+              (a) => a.id !== assignmentId && a.gearId === moving.gearId && a.bagId === toBagId,
+            );
+            if (existing) {
+              return {
+                ...t,
+                assignments: t.assignments
+                  .filter((a) => a.id !== assignmentId)
+                  .map((a) =>
+                    a.id === existing.id ? { ...a, quantity: a.quantity + moving.quantity } : a,
+                  ),
+              };
+            }
+            return {
+              ...t,
+              assignments: t.assignments.map((a) =>
+                a.id === assignmentId ? { ...a, bagId: toBagId } : a,
+              ),
+            };
+          }),
         })),
       addBag: (tripId, bag) =>
         set((s) => ({
