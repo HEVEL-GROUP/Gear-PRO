@@ -338,6 +338,44 @@ export function itemCount(trip: Trip): number {
   return trip.assignments.reduce((sum, a) => sum + a.quantity, 0);
 }
 
+// How many units of this gear are packed (checked_out) on OTHER trips right now.
+export function checkedOutElsewhere(trips: Trip[], gearId: string, excludeTripId: string): number {
+  return trips
+    .filter((t) => t.id !== excludeTripId)
+    .flatMap((t) => t.assignments)
+    .filter((a) => a.gearId === gearId && a.status === 'checked_out')
+    .reduce((sum, a) => sum + a.quantity, 0);
+}
+
+export function assignedInTrip(trip: Trip, gearId: string): number {
+  return trip.assignments
+    .filter((a) => a.gearId === gearId)
+    .reduce((sum, a) => sum + a.quantity, 0);
+}
+
+// Units still available to add to this trip: owned minus packed elsewhere minus already assigned here.
+export function remainingToAssign(item: GearItem, trips: Trip[], trip: Trip): number {
+  const elsewhere = checkedOutElsewhere(trips, item.id, trip.id);
+  const here = assignedInTrip(trip, item.id);
+  return Math.max(item.quantity - elsewhere - here, 0);
+}
+
+export function isExpiredDate(dateStr: string | undefined, today: string): boolean {
+  if (!dateStr) return false;
+  return dateStr < today;
+}
+
+// Every currently-packed (checked_out) assignment across all trips, newest trip first.
+export function allPackedAssignments(
+  trips: Trip[],
+): { trip: Trip; assignment: Assignment }[] {
+  return trips.flatMap((trip) =>
+    trip.assignments
+      .filter((a) => a.status === 'checked_out')
+      .map((assignment) => ({ trip, assignment })),
+  );
+}
+
 export type TripLifecycle = 'upcoming' | 'active' | 'needs_return' | 'closed';
 
 // Derived, not stored — so it's never out of sync with dates or item statuses.

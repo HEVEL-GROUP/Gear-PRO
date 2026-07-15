@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Mark } from '@/components/Mark';
 import { TripFormModal } from '@/components/TripFormModal';
@@ -87,28 +86,26 @@ export default function TripsScreen() {
       </View>
 
       {featured ? (
-        <Animated.View entering={FadeInDown.duration(340)}>
-          <Touchable onPress={() => router.push(`/trip/${featured.id}`)}>
-            <FeaturedCard
-              weight={tripWeight(featured, byId)}
-              target={bagTarget(featured)}
-              bags={featured.bags.length}
-              items={itemCount(featured)}
-              packed={packedCount(featured)}
-              name={featured.name}
-              range={fmtRange(featured.startDate, featured.endDate)}
-              breakdown={categoryBreakdown(featured, byId).slice(0, 3)}
-              barColors={barColors}
-              lifecycle={featuredLifecycle}
-            />
-          </Touchable>
-        </Animated.View>
+        <Touchable onPress={() => router.push(`/trip/${featured.id}`)}>
+          <FeaturedCard
+            weight={tripWeight(featured, byId)}
+            target={bagTarget(featured)}
+            bags={featured.bags.length}
+            items={itemCount(featured)}
+            packed={packedCount(featured)}
+            name={featured.name}
+            range={fmtRange(featured.startDate, featured.endDate)}
+            breakdown={categoryBreakdown(featured, byId).slice(0, 3)}
+            barColors={barColors}
+            lifecycle={featuredLifecycle}
+          />
+        </Touchable>
       ) : null}
 
       <View style={{ height: 14 }} />
 
-      {rest.map((trip, i) => (
-        <Animated.View key={trip.id} entering={FadeInDown.duration(340).delay(80 + i * 55)} style={{ marginBottom: 10 }}>
+      {rest.map((trip) => (
+        <View key={trip.id} style={{ marginBottom: 10 }}>
           <Touchable onPress={() => router.push(`/trip/${trip.id}`)}>
           <Card style={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <View
@@ -136,7 +133,7 @@ export default function TripsScreen() {
             </Text>
           </Card>
           </Touchable>
-        </Animated.View>
+        </View>
       ))}
 
       <Touchable onPress={() => setTripModal(true)}>

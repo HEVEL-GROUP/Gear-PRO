@@ -11,10 +11,13 @@ import { tapLight, tapSuccess } from '@/lib/haptics';
 import { font, useTheme } from '@/theme/tokens';
 import {
   bagTarget,
+  checkedOutElsewhere,
   GearStatus,
   gearMap,
+  isExpiredDate,
   itemCount,
   packedCount,
+  remainingToAssign,
   STATUS_LABELS,
   STATUS_ORDER,
   todayStamp,
@@ -89,6 +92,17 @@ export default function TripDetail() {
     trip.assignments
       .filter((a) => a.bagId === bagId)
       .reduce((sum, a) => sum + (byId[a.gearId]?.weightLb ?? 0) * a.quantity, 0);
+
+  // Max this specific assignment can grow to, given what's packed elsewhere and owned in total.
+  const maxQuantityFor = (assignment: (typeof trip.assignments)[number]) => {
+    const item = byId[assignment.gearId];
+    if (!item) return assignment.quantity;
+    const elsewhere = checkedOutElsewhere(trips, assignment.gearId, trip.id);
+    const otherInThisTrip = trip.assignments
+      .filter((x) => x.gearId === assignment.gearId && x.id !== assignment.id)
+      .reduce((sum, x) => sum + x.quantity, 0);
+    return Math.max(item.quantity - elsewhere - otherInThisTrip, 0);
+  };
 
   return (
     <Screen>
@@ -231,6 +245,7 @@ export default function TripDetail() {
             ) : (
               items.map((a) => {
                 const item = byId[a.gearId];
+                const expired = isExpiredDate(item?.expiration, today);
                 return (
                   <Card key={a.id} style={{ padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                     <View style={{ flex: 1 }}>
@@ -240,10 +255,11 @@ export default function TripDetail() {
                       <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
                         {item?.category} · {((item?.weightLb ?? 0) * a.quantity).toFixed(2)} lb
                       </Text>
-                      <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+                      <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                         <Pressable onPress={() => setStatusFor(a.id)}>
                           <Chip label={STATUS_LABELS[a.status]} tone={statusTone(a.status)} />
                         </Pressable>
+                        {expired ? <Chip label="Expired" tone="alert" /> : null}
                         {trip.bags.length > 1 ? (
                           <Pressable
                             onPress={() => {
@@ -268,12 +284,17 @@ export default function TripDetail() {
                     </View>
                     <Stepper
                       qty={a.quantity}
+                      atMax={a.quantity >= maxQuantityFor(a)}
                       onDec={() =>
                         a.quantity <= 1
                           ? removeAssignment(trip.id, a.id)
                           : updateAssignment(trip.id, a.id, { quantity: a.quantity - 1 })
                       }
-                      onInc={() => updateAssignment(trip.id, a.id, { quantity: a.quantity + 1 })}
+                      onInc={() => {
+                        if (a.quantity < maxQuantityFor(a)) {
+                          updateAssignment(trip.id, a.id, { quantity: a.quantity + 1 });
+                        }
+                      }}
                     />
                   </Card>
                 );
@@ -321,27 +342,36 @@ export default function TripDetail() {
         {gear.map((item) => {
           const inBag =
             trip.assignments.find((a) => a.gearId === item.id && a.bagId === assignBagId)?.quantity ?? 0;
+          const remaining = remainingToAssign(item, trips, trip);
+          const expired = isExpiredDate(item.expiration, today);
+          const disabled = remaining <= 0;
           return (
             <Pressable
               key={item.id}
+              disabled={disabled}
               onPress={() => {
-                if (assignBagId) {
+                if (assignBagId && !disabled) {
                   addAssignment(trip.id, assignBagId, item.id, 1);
                   tapLight();
                 }
               }}
-              style={{ marginBottom: 8 }}>
+              style={{ marginBottom: 8, opacity: disabled ? 0.5 : 1 }}>
               <Card style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.text }}>
                     {item.brand} {item.name}
                   </Text>
                   <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-                    {item.category} · {item.weightLb.toFixed(2)} lb
+                    {item.category} · {item.weightLb.toFixed(2)} lb · {remaining} left to pack
                   </Text>
                 </View>
+                {expired ? <Chip label="Expired" tone="alert" /> : null}
                 {inBag > 0 ? <Chip label={`In bag · ${inBag}`} tone="sage" /> : null}
-                <Ionicons name="add-circle" size={26} color={t.primary} />
+                <Ionicons
+                  name={disabled ? 'lock-closed-outline' : 'add-circle'}
+                  size={26}
+                  color={disabled ? t.textMuted : t.primary}
+                />
               </Card>
             </Pressable>
           );
@@ -449,7 +479,17 @@ function Stat({ label, value, color }: { label: string; value: string; color: st
   );
 }
 
-function Stepper({ qty, onDec, onInc }: { qty: number; onDec: () => void; onInc: () => void }) {
+function Stepper({
+  qty,
+  onDec,
+  onInc,
+  atMax,
+}: {
+  qty: number;
+  onDec: () => void;
+  onInc: () => void;
+  atMax?: boolean;
+}) {
   const t = useTheme();
   const btn = { width: 30, height: 30, borderRadius: 8, alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: t.surfaceAlt, borderWidth: 1, borderColor: t.border };
   return (
@@ -458,7 +498,15 @@ function Stepper({ qty, onDec, onInc }: { qty: number; onDec: () => void; onInc:
         <Ionicons name={qty <= 1 ? 'trash-outline' : 'remove'} size={16} color={t.text} />
       </Pressable>
       <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text, minWidth: 16, textAlign: 'center' }}>{qty}</Text>
-      <Pressable onPress={() => { tapLight(); onInc(); }} style={btn}>
+      <Pressable
+        disabled={atMax}
+        onPress={() => {
+          if (!atMax) {
+            tapLight();
+            onInc();
+          }
+        }}
+        style={[btn, atMax ? { opacity: 0.4 } : null]}>
         <Ionicons name="add" size={16} color={t.text} />
       </Pressable>
     </View>

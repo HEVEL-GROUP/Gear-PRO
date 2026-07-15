@@ -10,7 +10,18 @@ import { useGearStore } from '@/store/useGearStore';
 
 type Props = { visible: boolean; onClose: () => void; editId?: string | null };
 
-const blank = { brand: '', name: '', category: 'Shelter', weight: '', quantity: '1', notes: '', photoUri: '' };
+const blank = {
+  brand: '',
+  name: '',
+  category: 'Shelter',
+  weight: '',
+  quantity: '1',
+  notes: '',
+  photoUri: '',
+  expiration: '',
+};
+
+const isValidDate = (s: string) => s === '' || /^\d{4}-\d{2}-\d{2}$/.test(s.trim());
 
 export function GearFormModal({ visible, onClose, editId }: Props) {
   const t = useTheme();
@@ -38,6 +49,7 @@ export function GearFormModal({ visible, onClose, editId }: Props) {
             quantity: String(editing.quantity),
             notes: editing.notes ?? '',
             photoUri: editing.photoUri ?? '',
+            expiration: editing.expiration ?? '',
           }
         : blank,
     );
@@ -70,6 +82,10 @@ export function GearFormModal({ visible, onClose, editId }: Props) {
       setError('Add a brand, name, a weight above 0, and quantity of at least 1.');
       return;
     }
+    if (!isValidDate(form.expiration)) {
+      setError('Expiration date should look like 2026-12-31, or leave it blank.');
+      return;
+    }
     const payload = {
       brand: form.brand.trim(),
       name: form.name.trim(),
@@ -78,6 +94,7 @@ export function GearFormModal({ visible, onClose, editId }: Props) {
       quantity: Math.round(quantity),
       notes: form.notes.trim() || undefined,
       photoUri: form.photoUri || undefined,
+      expiration: form.expiration.trim() || undefined,
     };
     if (editing) updateGear(editing.id, payload);
     else addGear(payload);
@@ -144,6 +161,14 @@ export function GearFormModal({ visible, onClose, editId }: Props) {
           <Field label="Owned qty" value={form.quantity} onChangeText={(v) => setForm((f) => ({ ...f, quantity: v }))} placeholder="1" keyboardType="number-pad" />
         </View>
       </View>
+
+      <Field
+        label="Expiration date (optional)"
+        value={form.expiration}
+        onChangeText={(v) => setForm((f) => ({ ...f, expiration: v }))}
+        placeholder="2026-12-31"
+        autoCapitalize="none"
+      />
 
       <Field label="Notes" value={form.notes} onChangeText={(v) => setForm((f) => ({ ...f, notes: v }))} placeholder="Maintenance, fit, replacement…" multiline />
 

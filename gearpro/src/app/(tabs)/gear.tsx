@@ -2,16 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useMemo, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { GearFormModal } from '@/components/GearFormModal';
 import { Card, Chip, Display, Screen, Touchable } from '@/components/ui';
 import { font, radius, useTheme } from '@/theme/tokens';
-import { useGearStore } from '@/store/useGearStore';
+import { isExpiredDate, todayStamp, useGearStore } from '@/store/useGearStore';
 
 export default function GearScreen() {
   const t = useTheme();
   const gear = useGearStore((s) => s.gear);
+  const today = todayStamp();
   const [q, setQ] = useState('');
   const [modal, setModal] = useState<{ open: boolean; editId: string | null }>({
     open: false,
@@ -60,8 +60,8 @@ export default function GearScreen() {
         />
       </View>
 
-      {filtered.map((g, i) => (
-        <Animated.View key={g.id} entering={FadeInDown.duration(320).delay(Math.min(i * 40, 400))} style={{ marginBottom: 10 }}>
+      {filtered.map((g) => (
+        <View key={g.id} style={{ marginBottom: 10 }}>
           <Touchable onPress={() => setModal({ open: true, editId: g.id })}>
           <Card style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             {g.photoUri ? (
@@ -87,17 +87,18 @@ export default function GearScreen() {
               <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text }}>
                 {g.brand} {g.name}
               </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
                 <Chip label={g.category} tone="neutral" />
                 <Text style={{ fontFamily: font.semibold, fontSize: 12, color: t.textMuted }}>
                   {g.weightLb.toFixed(2)} lb · qty {g.quantity}
                 </Text>
+                {isExpiredDate(g.expiration, today) ? <Chip label="Expired" tone="alert" /> : null}
               </View>
             </View>
             <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
           </Card>
           </Touchable>
-        </Animated.View>
+        </View>
       ))}
 
       <Touchable onPress={() => setModal({ open: true, editId: null })}>
