@@ -43,6 +43,10 @@ jobs:
         run: cp dist/index.html dist/404.html
         working-directory: gearpro
 
+      - name: Pin custom domain
+        run: echo "gearpro.app" > dist/CNAME
+        working-directory: gearpro
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
