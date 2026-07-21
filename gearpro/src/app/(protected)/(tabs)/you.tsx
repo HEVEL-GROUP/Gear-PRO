@@ -1,8 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
 import { Mark } from '@/components/Mark';
 import { Card, Display, Screen } from '@/components/ui';
+import { useAuth } from '@/lib/auth/AuthProvider';
+import { tapLight } from '@/lib/haptics';
 import { font, useTheme } from '@/theme/tokens';
 import { useGearStore } from '@/store/useGearStore';
 
@@ -33,7 +36,9 @@ function Row({ icon, title, subtitle }: { icon: any; title: string; subtitle: st
 
 export default function YouScreen() {
   const t = useTheme();
+  const router = useRouter();
   const resetSeed = useGearStore((s) => s.resetSeed);
+  const { session, signOut } = useAuth();
 
   return (
     <Screen>
@@ -45,7 +50,7 @@ export default function YouScreen() {
         <Mark size={44} fill={t.primary} check={t.mode === 'dark' ? t.bg : t.cream} />
         <Display style={{ fontSize: 20, marginTop: 10 }}>Gear Pro</Display>
         <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginTop: 2 }}>
-          Everything saved on this device
+          Signed in as {session?.user.email}
         </Text>
       </Card>
 
@@ -54,14 +59,18 @@ export default function YouScreen() {
       <Card style={{ paddingVertical: 4 }}>
         <Row icon="cloud-offline-outline" title="Works offline" subtitle="Your gear and trips live on this device" />
         <View style={{ height: 1, backgroundColor: t.border }} />
-        <Row icon="cloud-upload-outline" title="Cloud sync" subtitle="Sign in to sync across devices — coming soon" />
+        <Row icon="cloud-upload-outline" title="Cloud sync" subtitle="Syncs your data across devices — coming soon" />
         <View style={{ height: 1, backgroundColor: t.border }} />
         <Row icon="download-outline" title="Backup & export" subtitle="Save a copy of your data — coming soon" />
       </Card>
 
       <View style={{ height: 16 }} />
 
-      <Pressable onPress={() => resetSeed()}>
+      <Pressable
+        onPress={() => {
+          tapLight();
+          resetSeed();
+        }}>
         <View
           style={{
             alignItems: 'center',
@@ -73,6 +82,25 @@ export default function YouScreen() {
           <Text style={{ fontFamily: font.semibold, fontSize: 14, color: t.textMuted }}>
             Reset demo data
           </Text>
+        </View>
+      </Pressable>
+
+      <View style={{ height: 10 }} />
+
+      <Pressable
+        onPress={async () => {
+          tapLight();
+          await signOut();
+          router.replace('/');
+        }}>
+        <View
+          style={{
+            alignItems: 'center',
+            paddingVertical: 14,
+            borderRadius: 14,
+            backgroundColor: t.alertSoft,
+          }}>
+          <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.alertText }}>Log out</Text>
         </View>
       </Pressable>
 

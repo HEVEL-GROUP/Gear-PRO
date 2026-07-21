@@ -1,8 +1,6 @@
 import '@/global.css';
 
-import {
-  Caprasimo_400Regular,
-} from '@expo-google-fonts/caprasimo';
+import { Caprasimo_400Regular } from '@expo-google-fonts/caprasimo';
 import {
   Figtree_400Regular,
   Figtree_500Medium,
@@ -13,10 +11,10 @@ import {
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
 import { useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AuthProvider } from '@/lib/auth/AuthProvider';
 import { useTheme } from '@/theme/tokens';
 
 export default function RootLayout() {
@@ -31,19 +29,22 @@ export default function RootLayout() {
   });
   const t = useTheme();
 
-  useEffect(() => {}, [loaded]);
-
   if (!loaded) {
     return <View style={{ flex: 1, backgroundColor: t.bg }} />;
   }
 
   return (
     <SafeAreaProvider>
-      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="trip/[id]" options={{ animation: 'slide_from_right' }} />
-      </Stack>
+      <AuthProvider>
+        <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="login" />
+          <Stack.Screen name="signup" />
+          <Stack.Screen name="auth/callback" />
+          <Stack.Screen name="(protected)" />
+        </Stack>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

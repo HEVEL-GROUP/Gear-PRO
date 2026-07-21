@@ -80,6 +80,8 @@ export function Field({
   keyboardType,
   multiline,
   autoCapitalize = 'sentences',
+  secureTextEntry,
+  autoComplete,
 }: {
   label: string;
   value: string;
@@ -88,6 +90,8 @@ export function Field({
   keyboardType?: KeyboardTypeOptions;
   multiline?: boolean;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  secureTextEntry?: boolean;
+  autoComplete?: 'email' | 'password' | 'off';
 }) {
   const t = useTheme();
   return (
@@ -101,6 +105,9 @@ export function Field({
         keyboardType={keyboardType}
         multiline={multiline}
         autoCapitalize={autoCapitalize}
+        secureTextEntry={secureTextEntry}
+        autoComplete={autoComplete}
+        textContentType={secureTextEntry ? 'password' : autoComplete === 'email' ? 'emailAddress' : undefined}
         style={{
           fontFamily: font.medium,
           fontSize: 16,
