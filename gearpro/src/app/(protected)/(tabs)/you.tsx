@@ -7,7 +7,6 @@ import { Card, Display, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { tapLight } from '@/lib/haptics';
 import { font, useTheme } from '@/theme/tokens';
-import { useGearStore } from '@/store/useGearStore';
 
 function Row({ icon, title, subtitle }: { icon: any; title: string; subtitle: string }) {
   const t = useTheme();
@@ -37,7 +36,6 @@ function Row({ icon, title, subtitle }: { icon: any; title: string; subtitle: st
 export default function YouScreen() {
   const t = useTheme();
   const router = useRouter();
-  const resetSeed = useGearStore((s) => s.resetSeed);
   const { session, signOut } = useAuth();
 
   return (
@@ -57,35 +55,14 @@ export default function YouScreen() {
       <View style={{ height: 12 }} />
 
       <Card style={{ paddingVertical: 4 }}>
-        <Row icon="cloud-offline-outline" title="Works offline" subtitle="Your gear and trips live on this device" />
+        <Row icon="cloud-offline-outline" title="Works offline" subtitle="Your gear and trips live on this device first" />
         <View style={{ height: 1, backgroundColor: t.border }} />
-        <Row icon="cloud-upload-outline" title="Cloud sync" subtitle="Syncs your data across devices — coming soon" />
+        <Row icon="cloud-upload-outline" title="Cloud sync" subtitle="Your data syncs automatically across every device you log into" />
         <View style={{ height: 1, backgroundColor: t.border }} />
         <Row icon="download-outline" title="Backup & export" subtitle="Save a copy of your data — coming soon" />
       </Card>
 
       <View style={{ height: 16 }} />
-
-      <Pressable
-        onPress={() => {
-          tapLight();
-          resetSeed();
-        }}>
-        <View
-          style={{
-            alignItems: 'center',
-            paddingVertical: 14,
-            borderRadius: 14,
-            borderWidth: 1,
-            borderColor: t.border,
-          }}>
-          <Text style={{ fontFamily: font.semibold, fontSize: 14, color: t.textMuted }}>
-            Reset demo data
-          </Text>
-        </View>
-      </Pressable>
-
-      <View style={{ height: 10 }} />
 
       <Pressable
         onPress={async () => {

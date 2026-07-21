@@ -2,11 +2,13 @@ import { Redirect, Stack } from 'expo-router';
 import { View } from 'react-native';
 
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { useCloudSync } from '@/lib/sync/useCloudSync';
 import { useTheme } from '@/theme/tokens';
 
 export default function ProtectedLayout() {
   const { session, isLoading } = useAuth();
   const t = useTheme();
+  useCloudSync();
 
   if (isLoading) {
     return <View style={{ flex: 1, backgroundColor: t.bg }} />;

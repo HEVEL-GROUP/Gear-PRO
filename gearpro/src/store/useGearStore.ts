@@ -77,8 +77,22 @@ export const CATEGORIES = [
   'Other',
 ];
 
-export const uid = () =>
-  Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Real UUIDs so local ids can sync 1:1 with Postgres uuid columns. Falls back
+// to a manual v4 generator on native JS engines that lack crypto.randomUUID.
+export const uid = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
+export const isUuid = (id: string): boolean => UUID_RE.test(id);
 
 const g = (
   id: string,
@@ -166,7 +180,6 @@ type StoreState = {
   addBag: (tripId: string, bag: Omit<Bag, 'id'>) => void;
   updateBag: (tripId: string, bagId: string, patch: Partial<Bag>) => void;
   removeBag: (tripId: string, bagId: string) => void;
-  resetSeed: () => void;
 };
 
 export const useGearStore = create<StoreState>()(
@@ -294,7 +307,6 @@ export const useGearStore = create<StoreState>()(
                 },
           ),
         })),
-      resetSeed: () => set({ gear: seedGear, trips: seedTrips(), categories: CATEGORIES }),
     }),
     {
       name: 'gearpro-v1',
