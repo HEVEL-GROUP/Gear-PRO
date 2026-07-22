@@ -1,11 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { Button } from '@/components/form';
 import { Mark } from '@/components/Mark';
 import { Card, Display, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { tapLight } from '@/lib/haptics';
+import { openBillingPortal, startCheckout } from '@/lib/stripe/checkout';
+import { supabase } from '@/lib/supabase/client';
 import { font, useTheme } from '@/theme/tokens';
 
 function Row({ icon, title, subtitle }: { icon: any; title: string; subtitle: string }) {
@@ -37,6 +41,29 @@ export default function YouScreen() {
   const t = useTheme();
   const router = useRouter();
   const { session, signOut } = useAuth();
+  const [isPro, setIsPro] = useState<boolean | null>(null);
+  const [billingBusy, setBillingBusy] = useState(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!session) return;
+    supabase.rpc('is_pro_user').then(({ data, error }) => {
+      if (!error) setIsPro(Boolean(data));
+    });
+  }, [session]);
+
+  const handleBilling = async (action: () => Promise<void>) => {
+    if (billingBusy) return;
+    setBillingBusy(true);
+    setBillingError(null);
+    try {
+      await action();
+    } catch (err) {
+      setBillingError(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setBillingBusy(false);
+    }
+  };
 
   return (
     <Screen>
@@ -61,6 +88,29 @@ export default function YouScreen() {
         <View style={{ height: 1, backgroundColor: t.border }} />
         <Row icon="download-outline" title="Backup & export" subtitle="Save a copy of your data — coming soon" />
       </Card>
+
+      <View style={{ height: 12 }} />
+
+      {isPro !== null && (
+        <Card style={{ paddingVertical: 16, gap: 10 }}>
+          <View>
+            <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text }}>
+              {isPro ? 'GearPro Pro' : 'Free plan'}
+            </Text>
+            <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
+              {isPro ? "You're supporting GearPro's development" : 'Upgrade whenever you’re ready'}
+            </Text>
+          </View>
+          <Button
+            label={billingBusy ? 'Opening…' : isPro ? 'Manage subscription' : 'Upgrade to Pro'}
+            tone={isPro ? 'ghost' : 'primary'}
+            onPress={() => handleBilling(isPro ? openBillingPortal : startCheckout)}
+          />
+          {billingError && (
+            <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.alert }}>{billingError}</Text>
+          )}
+        </Card>
+      )}
 
       <View style={{ height: 16 }} />
 
