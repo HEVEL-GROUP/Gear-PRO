@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ReactNode } from 'react';
-import { Text, useWindowDimensions, View, ViewStyle } from 'react-native';
+import { ScrollView, Text, useWindowDimensions, View, ViewStyle } from 'react-native';
 
 import { FeaturedCard } from '@/components/TripCard';
 import { Mark } from '@/components/Mark';
@@ -192,7 +192,10 @@ export function LandingPage() {
   const isWide = width >= 880;
 
   return (
-    <View style={{ flex: 1, backgroundColor: t.bg, alignItems: 'center' }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: t.bg }}
+      contentContainerStyle={{ alignItems: 'center' }}
+      showsVerticalScrollIndicator={false}>
       <View style={{ width: '100%', maxWidth: MAX_WIDTH, paddingHorizontal: 20, paddingBottom: 70 }}>
         <NavBar onLogin={() => router.push('/login')} onSignup={() => router.push('/signup')} />
 
@@ -500,6 +503,6 @@ export function LandingPage() {
           </View>
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
