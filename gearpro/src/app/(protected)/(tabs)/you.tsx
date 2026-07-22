@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Button } from '@/components/form';
@@ -9,8 +9,12 @@ import { Card, Display, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { tapLight } from '@/lib/haptics';
 import { openBillingPortal, startCheckout } from '@/lib/stripe/checkout';
-import { supabase } from '@/lib/supabase/client';
+import { usePro } from '@/lib/stripe/usePro';
 import { font, useTheme } from '@/theme/tokens';
+
+function daysLeft(isoDate: string): number {
+  return Math.max(0, Math.ceil((new Date(isoDate).getTime() - Date.now()) / 86_400_000));
+}
 
 function Row({ icon, title, subtitle }: { icon: any; title: string; subtitle: string }) {
   const t = useTheme();
@@ -41,16 +45,11 @@ export default function YouScreen() {
   const t = useTheme();
   const router = useRouter();
   const { session, signOut } = useAuth();
-  const [isPro, setIsPro] = useState<boolean | null>(null);
+  const { planType, trialEndsAt } = usePro();
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!session) return;
-    supabase.rpc('is_pro_user').then(({ data, error }) => {
-      if (!error) setIsPro(Boolean(data));
-    });
-  }, [session]);
+  const isTrial = planType === 'trial';
 
   const handleBilling = async (action: () => Promise<void>) => {
     if (billingBusy) return;
@@ -91,20 +90,22 @@ export default function YouScreen() {
 
       <View style={{ height: 12 }} />
 
-      {isPro !== null && (
+      {planType !== null && (
         <Card style={{ paddingVertical: 16, gap: 10 }}>
           <View>
             <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text }}>
-              {isPro ? 'GearPro Pro' : 'Free plan'}
+              {isTrial ? 'Free trial' : 'GearPro Pro'}
             </Text>
             <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-              {isPro ? "You're supporting GearPro's development" : 'Upgrade whenever you’re ready'}
+              {isTrial && trialEndsAt
+                ? `${daysLeft(trialEndsAt)} day${daysLeft(trialEndsAt) === 1 ? '' : 's'} left — subscribe anytime`
+                : "You're supporting GearPro's development"}
             </Text>
           </View>
           <Button
-            label={billingBusy ? 'Opening…' : isPro ? 'Manage subscription' : 'Upgrade to Pro'}
-            tone={isPro ? 'ghost' : 'primary'}
-            onPress={() => handleBilling(isPro ? openBillingPortal : startCheckout)}
+            label={billingBusy ? 'Opening…' : isTrial ? 'Subscribe — $4.99/mo' : 'Manage subscription'}
+            tone={isTrial ? 'primary' : 'ghost'}
+            onPress={() => handleBilling(isTrial ? startCheckout : openBillingPortal)}
           />
           {billingError && (
             <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.alert }}>{billingError}</Text>

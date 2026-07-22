@@ -68,7 +68,7 @@ const darkTheme = {
   alertText: '#e0a06a',
 };
 
-export type Theme = typeof lightTheme;
+export type Theme = Omit<typeof lightTheme, 'mode'> & { mode: 'light' | 'dark' };
 
 export function useTheme(): Theme {
   const scheme = useColorScheme();
