@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useMemo, useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 import { GearFormModal } from '@/components/GearFormModal';
 import { Card, Chip, Display, Screen, Touchable } from '@/components/ui';
@@ -10,6 +10,8 @@ import { isExpiredDate, todayStamp, useGearStore } from '@/store/useGearStore';
 
 export default function GearScreen() {
   const t = useTheme();
+  const { width } = useWindowDimensions();
+  const isWide = width >= 880;
   const gear = useGearStore((s) => s.gear);
   const today = todayStamp();
   const [q, setQ] = useState('');
@@ -29,7 +31,7 @@ export default function GearScreen() {
   const totalWeight = gear.reduce((s, g) => s + g.weightLb * g.quantity, 0);
 
   return (
-    <Screen>
+    <Screen maxWidth={isWide ? 860 : 720}>
       <View style={{ paddingTop: 8, paddingBottom: 12 }}>
         <Display style={{ fontSize: 26 }}>Gear library</Display>
         <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginTop: 4 }}>

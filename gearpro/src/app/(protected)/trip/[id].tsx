@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 
 import { BagFormSheet } from '@/components/BagFormSheet';
 import { Sheet } from '@/components/form';
@@ -48,6 +48,8 @@ export default function TripDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const t = useTheme();
+  const { width } = useWindowDimensions();
+  const isWide = width >= 880;
 
   const trips = useGearStore((s) => s.trips);
   const gear = useGearStore((s) => s.gear);
@@ -71,7 +73,7 @@ export default function TripDetail() {
 
   if (!trip) {
     return (
-      <Screen>
+      <Screen maxWidth={isWide ? 860 : 720}>
         <View style={{ paddingTop: 20 }}>
           <Display>Trip not found</Display>
           <Pressable onPress={() => router.back()} style={{ marginTop: 16 }}>
@@ -105,7 +107,7 @@ export default function TripDetail() {
   };
 
   return (
-    <Screen>
+    <Screen maxWidth={isWide ? 860 : 720}>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 6, paddingBottom: 12 }}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginRight: 6 }}>
           <Ionicons name="chevron-back" size={26} color={t.text} />

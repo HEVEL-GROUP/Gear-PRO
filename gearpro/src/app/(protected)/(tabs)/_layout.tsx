@@ -1,11 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
+import { Platform, useWindowDimensions } from 'react-native';
 
 import { font, useTheme } from '@/theme/tokens';
 
 export default function TabsLayout() {
   const t = useTheme();
+  const { width } = useWindowDimensions();
+  const isWide = width >= 880;
+
   return (
     <Tabs
       screenOptions={{
@@ -13,12 +16,16 @@ export default function TabsLayout() {
         tabBarActiveTintColor: t.primary,
         tabBarInactiveTintColor: t.barMuted,
         tabBarLabelStyle: { fontFamily: font.semibold, fontSize: 11 },
-        tabBarStyle: {
-          backgroundColor: t.bar,
-          borderTopWidth: 0,
-          height: Platform.OS === 'web' ? 62 : undefined,
-          paddingTop: 6,
-        },
+        // The sidebar (rendered one level up, in (protected)/_layout.tsx so it
+        // also covers trip/[id]) replaces this entirely on wide viewports.
+        tabBarStyle: isWide
+          ? { display: 'none' }
+          : {
+              backgroundColor: t.bar,
+              borderTopWidth: 0,
+              height: Platform.OS === 'web' ? 62 : undefined,
+              paddingTop: 6,
+            },
       }}>
       <Tabs.Screen
         name="home"

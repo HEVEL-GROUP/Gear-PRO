@@ -5,9 +5,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { tapLight } from '@/lib/haptics';
 import { font, radius, useTheme } from '@/theme/tokens';
 
-export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
+export function Screen({
+  children,
+  scroll = true,
+  maxWidth = 720,
+}: {
+  children: ReactNode;
+  scroll?: boolean;
+  maxWidth?: number;
+}) {
   const t = useTheme();
-  const body = <View style={styles.inner}>{children}</View>;
+  const body = <View style={[styles.inner, { maxWidth }]}>{children}</View>;
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: t.bg }]} edges={['top']}>
       {scroll ? (

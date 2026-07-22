@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { Text, View } from 'react-native';
+import { Text, useWindowDimensions, View } from 'react-native';
 
 import { Card, Chip, Display, Screen, Touchable } from '@/components/ui';
 import { font, useTheme } from '@/theme/tokens';
@@ -16,6 +16,8 @@ import {
 export default function PackScreen() {
   const t = useTheme();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isWide = width >= 880;
   const gear = useGearStore((s) => s.gear);
   const trips = useGearStore((s) => s.trips);
   const byId = useMemo(() => gearMap(gear), [gear]);
@@ -38,7 +40,7 @@ export default function PackScreen() {
     .reduce((sum, r) => sum + (byId[r.assignment.gearId]?.weightLb ?? 0) * r.assignment.quantity, 0);
 
   return (
-    <Screen>
+    <Screen maxWidth={isWide ? 860 : 720}>
       <View style={{ paddingTop: 8, paddingBottom: 12 }}>
         <Display style={{ fontSize: 26 }}>Packing</Display>
         <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginTop: 4 }}>

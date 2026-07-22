@@ -1,6 +1,7 @@
 import { Redirect, Stack } from 'expo-router';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
+import { Sidebar } from '@/components/Sidebar';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { useCloudSync } from '@/lib/sync/useCloudSync';
 import { usePro } from '@/lib/stripe/usePro';
@@ -10,6 +11,8 @@ export default function ProtectedLayout() {
   const { session, isLoading } = useAuth();
   const { isPro } = usePro();
   const t = useTheme();
+  const { width } = useWindowDimensions();
+  const isWide = width >= 880;
   useCloudSync();
 
   if (isLoading || (session && isPro === null)) {
@@ -25,9 +28,14 @@ export default function ProtectedLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="trip/[id]" options={{ animation: 'slide_from_right' }} />
-    </Stack>
+    <View style={{ flex: 1, flexDirection: isWide ? 'row' : 'column' }}>
+      {isWide && <Sidebar />}
+      <View style={{ flex: 1 }}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="trip/[id]" options={{ animation: 'slide_from_right' }} />
+        </Stack>
+      </View>
+    </View>
   );
 }

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 
 import { Button } from '@/components/form';
 import { Mark } from '@/components/Mark';
@@ -44,6 +44,8 @@ function Row({ icon, title, subtitle }: { icon: any; title: string; subtitle: st
 export default function YouScreen() {
   const t = useTheme();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isWide = width >= 880;
   const { session, signOut } = useAuth();
   const { planType, trialEndsAt } = usePro();
   const [billingBusy, setBillingBusy] = useState(false);
@@ -65,7 +67,7 @@ export default function YouScreen() {
   };
 
   return (
-    <Screen>
+    <Screen maxWidth={isWide ? 860 : 720}>
       <View style={{ paddingTop: 8, paddingBottom: 14 }}>
         <Display style={{ fontSize: 26 }}>You</Display>
       </View>

@@ -5,8 +5,10 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -26,19 +28,32 @@ export function Sheet({
   children: ReactNode;
 }) {
   const t = useTheme();
+  const { width } = useWindowDimensions();
+  const isWide = width >= 640;
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(18,16,12,0.55)', justifyContent: 'flex-end' }}>
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
+    <Modal visible={visible} transparent animationType={isWide ? 'fade' : 'slide'} onRequestClose={onClose}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(18,16,12,0.55)',
+          justifyContent: isWide ? 'center' : 'flex-end',
+          alignItems: isWide ? 'center' : 'stretch',
+        }}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View
           style={{
             backgroundColor: t.bg,
             borderTopLeftRadius: 26,
             borderTopRightRadius: 26,
+            borderBottomLeftRadius: isWide ? 26 : 0,
+            borderBottomRightRadius: isWide ? 26 : 0,
             paddingHorizontal: 20,
             paddingTop: 18,
-            paddingBottom: 34,
-            maxHeight: '90%',
+            paddingBottom: isWide ? 22 : 34,
+            maxHeight: isWide ? '85%' : '90%',
+            width: isWide ? 520 : '100%',
+            maxWidth: isWide ? '92%' : undefined,
           }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
             <Display style={{ fontSize: 22, flex: 1 }}>{title}</Display>

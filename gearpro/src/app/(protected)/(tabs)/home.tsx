@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Text, useWindowDimensions, View } from 'react-native';
 
 import { Mark } from '@/components/Mark';
 import { FeaturedCard } from '@/components/TripCard';
@@ -45,6 +45,8 @@ function LifecycleChip({ trip, today }: { trip: Trip; today: string }) {
 export default function TripsScreen() {
   const t = useTheme();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isWide = width >= 880;
   const gear = useGearStore((s) => s.gear);
   const trips = useGearStore((s) => s.trips);
   const byId = useMemo(() => gearMap(gear), [gear]);
@@ -62,7 +64,7 @@ export default function TripsScreen() {
   const barColors = [t.primary, t.primaryDark, t.sageMuted];
 
   return (
-    <Screen>
+    <Screen maxWidth={isWide ? 860 : 720}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 8, paddingBottom: 14 }}>
         <Mark size={30} fill={t.primary} check={t.mode === 'dark' ? t.bg : t.cream} />
         <Display style={{ fontSize: 26 }}>Trips</Display>
