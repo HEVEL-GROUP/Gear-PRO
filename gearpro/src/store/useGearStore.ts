@@ -20,6 +20,12 @@ export type GearItem = {
   notes?: string;
   expiration?: string;
   photoUri?: string;
+  // True only for the sample items Gear Pro ships with -- an explicit flag
+  // rather than inferring from id shape, because syncOnLogin remaps every
+  // non-UUID local id to a real UUID on first cloud sync, which would
+  // otherwise erase the "is this demo data" signal for every user who ever
+  // logs in.
+  isDemo?: boolean;
 };
 
 export type Bag = { id: string; label: string; maxWeightLb: number; color: string };
@@ -44,6 +50,7 @@ export type Trip = {
   endDate: string;
   bags: Bag[];
   assignments: Assignment[];
+  isDemo?: boolean;
 };
 
 export const STATUS_LABELS: Record<GearStatus, string> = {
@@ -151,7 +158,7 @@ const seedGear: GearItem[] = [
   g('optics', 'Vortex', 'Diamondback 10x42', 'Hunting', 1.6),
   g('rangefinder', 'Sig', 'Kilo 2200', 'Hunting', 0.5),
   g('layers', 'KUIU', 'Super Down Pro Jacket', 'Clothing', 0.9),
-];
+].map((item) => ({ ...item, isDemo: true }));
 
 const myPack = (): Bag => ({ id: uid(), label: 'My Pack', maxWeightLb: 45, color: '#7a8a5e' });
 
@@ -170,6 +177,7 @@ function seedTrips(): Trip[] {
     location: 'Bighorn Mountains, WY',
     startDate: '2026-10-12',
     endDate: '2026-10-16',
+    isDemo: true,
     bags: [bagA, bagB],
     assignments: [
       pk(bagA.id, 'tent', 1, true),
@@ -190,6 +198,7 @@ function seedTrips(): Trip[] {
     location: 'Cloud Peak trailhead',
     startDate: '2026-11-02',
     endDate: '2026-11-03',
+    isDemo: true,
     bags: [myPack()],
     assignments: [],
   };
@@ -202,7 +211,9 @@ type StoreState = {
   categories: string[];
   customCategories: string[];
   addCategory: (name: string) => void;
+  renameCategory: (oldName: string, newName: string) => void;
   removeCategory: (name: string) => void;
+  clearDemoData: () => void;
   addGear: (item: Omit<GearItem, 'id'>) => void;
   updateGear: (id: string, patch: Partial<GearItem>) => void;
   removeGear: (id: string) => void;
@@ -239,12 +250,47 @@ export const useGearStore = create<StoreState>()(
           const customCategories = [...s.customCategories, trimmed];
           return { customCategories, categories: [...CATEGORIES, ...customCategories] };
         }),
+      renameCategory: (oldName, newName) =>
+        set((s) => {
+          const trimmed = newName.trim();
+          if (!trimmed || trimmed.toLowerCase() === oldName.toLowerCase()) return s;
+          const clash = s.categories.some(
+            (c) => c.toLowerCase() === trimmed.toLowerCase() && c.toLowerCase() !== oldName.toLowerCase(),
+          );
+          if (clash) return s;
+          const customCategories = s.customCategories.map((c) =>
+            c.toLowerCase() === oldName.toLowerCase() ? trimmed : c,
+          );
+          return {
+            customCategories,
+            categories: [...CATEGORIES, ...customCategories],
+            gear: s.gear.map((g) => (g.category === oldName ? { ...g, category: trimmed } : g)),
+          };
+        }),
       removeCategory: (name) =>
         set((s) => {
           const customCategories = s.customCategories.filter(
             (c) => c.toLowerCase() !== name.toLowerCase(),
           );
           return { customCategories, categories: [...CATEGORIES, ...customCategories] };
+        }),
+      // Wipes the seed gear/trips Gear Pro ships with, identified by their
+      // isDemo flag -- so a first-time user can start clean instead of
+      // deleting demo items one by one. Also strips any assignment in a
+      // surviving trip that pointed at deleted demo gear, so nothing is
+      // left dangling.
+      clearDemoData: () =>
+        set((s) => {
+          const demoGearIds = new Set(s.gear.filter((g) => g.isDemo).map((g) => g.id));
+          return {
+            gear: s.gear.filter((g) => !g.isDemo),
+            trips: s.trips
+              .filter((t) => !t.isDemo)
+              .map((t) => ({
+                ...t,
+                assignments: t.assignments.filter((a) => !demoGearIds.has(a.gearId)),
+              })),
+          };
         }),
       addGear: (item) => set((s) => ({ gear: [...s.gear, { ...item, id: uid() }] })),
       updateGear: (id, patch) =>
@@ -468,6 +514,15 @@ export function flaggedAssignments(trips: Trip[]): { trip: Trip; assignment: Ass
       .filter((a) => a.status === 'needs_repair' || a.status === 'consumed' || a.status === 'lost')
       .map((assignment) => ({ trip, assignment })),
   );
+}
+
+// Counts of the seed gear/trips still present -- used to show (and gate) the
+// "clear demo data" action once a user has started adding their own.
+export function demoDataCounts(gear: GearItem[], trips: Trip[]): { gear: number; trips: number } {
+  return {
+    gear: gear.filter((g) => g.isDemo).length,
+    trips: trips.filter((t) => t.isDemo).length,
+  };
 }
 
 export type TripLifecycle = 'upcoming' | 'active' | 'needs_return' | 'closed';

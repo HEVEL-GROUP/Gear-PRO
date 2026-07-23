@@ -5,8 +5,10 @@ import { Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } fro
 
 import { GearFormModal } from '@/components/GearFormModal';
 import { ImportGearSheet } from '@/components/ImportGearSheet';
+import { ManageCategoriesSheet } from '@/components/ManageCategoriesSheet';
 import { NeedsAttentionSheet } from '@/components/NeedsAttentionSheet';
 import { Card, Chip, Display, Screen, Touchable } from '@/components/ui';
+import { tapLight } from '@/lib/haptics';
 import { font, radius, useTheme } from '@/theme/tokens';
 import {
   flaggedAssignments,
@@ -24,6 +26,7 @@ export default function GearScreen() {
   const gear = useGearStore((s) => s.gear);
   const trips = useGearStore((s) => s.trips);
   const allCategories = useGearStore((s) => s.categories);
+  const removeGear = useGearStore((s) => s.removeGear);
   const today = todayStamp();
   const [q, setQ] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -33,6 +36,7 @@ export default function GearScreen() {
   });
   const [importOpen, setImportOpen] = useState(false);
   const [attentionOpen, setAttentionOpen] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
 
   const flaggedCount = useMemo(() => flaggedAssignments(trips).length, [trips]);
 
@@ -57,45 +61,64 @@ export default function GearScreen() {
 
   const totalWeight = gear.reduce((s, g) => s + g.weightLb * g.quantity, 0);
 
-  const renderGearRow = (g: GearItem) => (
-    <View key={g.id} style={{ marginBottom: 10 }}>
-      <Touchable onPress={() => setModal({ open: true, editId: g.id })}>
-        <Card style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          {g.photoUri ? (
-            <Image
-              source={{ uri: g.photoUri }}
-              style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: t.surfaceAlt }}
-              contentFit="cover"
-            />
-          ) : (
-            <View
-              style={{
-                width: 52,
-                height: 52,
-                borderRadius: 12,
-                backgroundColor: t.soft,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-              <Ionicons name="image-outline" size={22} color={t.softText} />
-            </View>
-          )}
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text }}>
-              {g.brand} {g.name}
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-              <Text style={{ fontFamily: font.semibold, fontSize: 12, color: t.textMuted }}>
-                {g.weightLb.toFixed(2)} lb · qty {g.quantity}
+  // A gear item assigned to any trip (any status) can't be quick-deleted --
+  // tapping the trash icon instead opens the edit modal, which already
+  // explains why and where to unassign it first.
+  const renderGearRow = (g: GearItem) => {
+    const inUse = trips.some((tr) => tr.assignments.some((a) => a.gearId === g.id));
+    return (
+      <View key={g.id} style={{ marginBottom: 10 }}>
+        <Touchable onPress={() => setModal({ open: true, editId: g.id })}>
+          <Card style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            {g.photoUri ? (
+              <Image
+                source={{ uri: g.photoUri }}
+                style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: t.surfaceAlt }}
+                contentFit="cover"
+              />
+            ) : (
+              <View
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 12,
+                  backgroundColor: t.soft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Ionicons name="image-outline" size={22} color={t.softText} />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text }}>
+                {g.brand} {g.name}
               </Text>
-              {isExpiredDate(g.expiration, today) ? <Chip label="Expired" tone="alert" /> : null}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                <Text style={{ fontFamily: font.semibold, fontSize: 12, color: t.textMuted }}>
+                  {g.weightLb.toFixed(2)} lb · qty {g.quantity}
+                </Text>
+                {isExpiredDate(g.expiration, today) ? <Chip label="Expired" tone="alert" /> : null}
+              </View>
             </View>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
-        </Card>
-      </Touchable>
-    </View>
-  );
+            <Pressable
+              hitSlop={10}
+              onPress={(e) => {
+                e.stopPropagation();
+                if (inUse) {
+                  setModal({ open: true, editId: g.id });
+                  return;
+                }
+                tapLight();
+                removeGear(g.id);
+              }}>
+              <Ionicons name="trash-outline" size={18} color={inUse ? t.textMuted : t.alert} />
+            </Pressable>
+            <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
+          </Card>
+        </Touchable>
+      </View>
+    );
+  };
 
   return (
     <Screen maxWidth={isWide ? 860 : 720}>
@@ -106,6 +129,9 @@ export default function GearScreen() {
             {gear.length} items · {totalWeight.toFixed(1)} lb owned
           </Text>
         </View>
+        <Pressable onPress={() => setCategoriesOpen(true)} hitSlop={10} style={{ padding: 6, marginTop: 2 }}>
+          <Ionicons name="pricetags-outline" size={22} color={t.primary} />
+        </Pressable>
         <Pressable onPress={() => setImportOpen(true)} hitSlop={10} style={{ padding: 6, marginTop: 2 }}>
           <Ionicons name="cloud-upload-outline" size={22} color={t.primary} />
         </Pressable>
@@ -238,6 +264,7 @@ export default function GearScreen() {
       />
       <ImportGearSheet visible={importOpen} onClose={() => setImportOpen(false)} />
       <NeedsAttentionSheet visible={attentionOpen} onClose={() => setAttentionOpen(false)} />
+      <ManageCategoriesSheet visible={categoriesOpen} onClose={() => setCategoriesOpen(false)} />
     </Screen>
   );
 }

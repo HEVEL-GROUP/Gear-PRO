@@ -53,6 +53,7 @@ function toGearRow(userId: string, g: GearItem) {
     notes: g.notes ?? null,
     expiration: g.expiration || null,
     photo_uri: g.photoUri ?? null,
+    is_demo: g.isDemo ?? false,
   };
 }
 
@@ -66,6 +67,7 @@ function toTripRow(userId: string, t: Trip) {
     location_lon: t.locationLon ?? null,
     start_date: t.startDate || null,
     end_date: t.endDate || null,
+    is_demo: t.isDemo ?? false,
   };
 }
 
@@ -141,6 +143,7 @@ export async function pullFromCloud(): Promise<void> {
     notes: r.notes ?? undefined,
     expiration: r.expiration ?? undefined,
     photoUri: r.photo_uri ?? undefined,
+    isDemo: r.is_demo ?? false,
   }));
 
   const bagsByTrip = new Map<string, Bag[]>();
@@ -172,6 +175,7 @@ export async function pullFromCloud(): Promise<void> {
     endDate: r.end_date ?? '',
     bags: bagsByTrip.get(r.id) ?? [],
     assignments: assignmentsByTrip.get(r.id) ?? [],
+    isDemo: r.is_demo ?? false,
   }));
 
   useGearStore.setState({ gear, trips });
