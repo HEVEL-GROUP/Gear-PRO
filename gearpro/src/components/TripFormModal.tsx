@@ -10,7 +10,7 @@ import { uid, useGearStore } from '@/store/useGearStore';
 
 type Props = { visible: boolean; onClose: () => void; onCreated?: (id: string) => void };
 
-const blank = { name: '', location: '', startDate: '', endDate: '' };
+const blank = { name: '', location: '', locationLat: undefined as number | undefined, locationLon: undefined as number | undefined, startDate: '', endDate: '' };
 
 const MONTH_SHORT = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
@@ -43,6 +43,8 @@ export function TripFormModal({ visible, onClose, onCreated }: Props) {
     const id = addTrip({
       name: form.name.trim(),
       location: form.location.trim(),
+      locationLat: form.locationLat,
+      locationLon: form.locationLon,
       startDate: form.startDate,
       endDate: form.endDate,
       bags: [{ id: uid(), label: 'My Pack', maxWeightLb: 45, color: '#7a8a5e' }],
@@ -58,7 +60,8 @@ export function TripFormModal({ visible, onClose, onCreated }: Props) {
       <PlaceField
         label="Location"
         value={form.location}
-        onChangeText={(v) => setForm((f) => ({ ...f, location: v }))}
+        onChangeText={(v) => setForm((f) => ({ ...f, location: v, locationLat: undefined, locationLon: undefined }))}
+        onSelectCoords={(lat, lon) => setForm((f) => ({ ...f, locationLat: lat, locationLon: lon }))}
         placeholder="Bighorn Mountains, WY"
       />
 

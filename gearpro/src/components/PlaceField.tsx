@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-nativ
 import { Label } from '@/components/form';
 import { font, useTheme } from '@/theme/tokens';
 
-type Suggestion = { id: string; label: string };
+type Suggestion = { id: string; label: string; lat: number; lon: number };
 
 // OpenStreetMap Nominatim -- free, no API key. Their usage policy wants
 // light client-side usage identified by Referer (which the browser sends
@@ -14,19 +14,29 @@ async function searchPlaces(query: string): Promise<Suggestion[]> {
   const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=6`;
   const res = await fetch(url, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error('Place search failed');
-  const data: { place_id: number; display_name: string }[] = await res.json();
-  return data.map((d) => ({ id: String(d.place_id), label: d.display_name }));
+  const data: { place_id: number; display_name: string; lat: string; lon: string }[] = await res.json();
+  return data.map((d) => ({
+    id: String(d.place_id),
+    label: d.display_name,
+    lat: Number(d.lat),
+    lon: Number(d.lon),
+  }));
 }
 
 export function PlaceField({
   label,
   value,
   onChangeText,
+  onSelectCoords,
   placeholder,
 }: {
   label: string;
   value: string;
   onChangeText: (v: string) => void;
+  // Fires only when a suggestion is tapped (a real geocoded point) -- typing
+  // free text never gives us coordinates, so callers must treat this as
+  // optional and handle the no-coords case.
+  onSelectCoords?: (lat: number, lon: number) => void;
   placeholder?: string;
 }) {
   const t = useTheme();
@@ -120,6 +130,7 @@ export function PlaceField({
               key={s.id}
               onPress={() => {
                 onChangeText(s.label);
+                onSelectCoords?.(s.lat, s.lon);
                 setSuggestions([]);
                 setOpen(false);
               }}

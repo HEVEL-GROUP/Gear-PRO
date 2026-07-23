@@ -22,7 +22,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  `connect-src 'self' ${supabaseOrigin} https://nominatim.openstreetmap.org`,
+  `connect-src 'self' blob: ${supabaseOrigin} https://nominatim.openstreetmap.org https://api.weather.gov`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

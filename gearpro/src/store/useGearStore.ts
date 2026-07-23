@@ -37,6 +37,8 @@ export type Trip = {
   id: string;
   name: string;
   location: string;
+  locationLat?: number;
+  locationLon?: number;
   startDate: string;
   endDate: string;
   bags: Bag[];
@@ -185,6 +187,9 @@ type StoreState = {
   gear: GearItem[];
   trips: Trip[];
   categories: string[];
+  customCategories: string[];
+  addCategory: (name: string) => void;
+  removeCategory: (name: string) => void;
   addGear: (item: Omit<GearItem, 'id'>) => void;
   updateGear: (id: string, patch: Partial<GearItem>) => void;
   removeGear: (id: string) => void;
@@ -206,6 +211,28 @@ export const useGearStore = create<StoreState>()(
       gear: seedGear,
       trips: seedTrips(),
       categories: CATEGORIES,
+      customCategories: [],
+      // Custom categories tack onto the fixed CATEGORIES list (kept in sync
+      // via `categories`, which is what every picker/grouping reads from) --
+      // matching case-insensitively against a name that already exists is a
+      // no-op rather than a duplicate, so the same trip typo doesn't create
+      // two near-identical categories.
+      addCategory: (name) =>
+        set((s) => {
+          const trimmed = name.trim();
+          if (!trimmed) return s;
+          const exists = s.categories.some((c) => c.toLowerCase() === trimmed.toLowerCase());
+          if (exists) return s;
+          const customCategories = [...s.customCategories, trimmed];
+          return { customCategories, categories: [...CATEGORIES, ...customCategories] };
+        }),
+      removeCategory: (name) =>
+        set((s) => {
+          const customCategories = s.customCategories.filter(
+            (c) => c.toLowerCase() !== name.toLowerCase(),
+          );
+          return { customCategories, categories: [...CATEGORIES, ...customCategories] };
+        }),
       addGear: (item) => set((s) => ({ gear: [...s.gear, { ...item, id: uid() }] })),
       updateGear: (id, patch) =>
         set((s) => ({ gear: s.gear.map((it) => (it.id === id ? { ...it, ...patch } : it)) })),

@@ -62,6 +62,8 @@ function toTripRow(userId: string, t: Trip) {
     user_id: userId,
     name: t.name,
     location: t.location,
+    location_lat: t.locationLat ?? null,
+    location_lon: t.locationLon ?? null,
     start_date: t.startDate || null,
     end_date: t.endDate || null,
   };
@@ -162,6 +164,8 @@ export async function pullFromCloud(): Promise<void> {
     id: r.id,
     name: r.name,
     location: r.location ?? '',
+    locationLat: r.location_lat ?? undefined,
+    locationLon: r.location_lon ?? undefined,
     startDate: r.start_date ?? '',
     endDate: r.end_date ?? '',
     bags: bagsByTrip.get(r.id) ?? [],

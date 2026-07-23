@@ -6,6 +6,7 @@ import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { BagFormSheet } from '@/components/BagFormSheet';
 import { Sheet } from '@/components/form';
 import { Card, Chip, Display, Screen } from '@/components/ui';
+import { WeatherCard } from '@/components/WeatherCard';
 import { WeightRing } from '@/components/WeightRing';
 import { tapLight, tapSuccess } from '@/lib/haptics';
 import { font, useTheme } from '@/theme/tokens';
@@ -284,6 +285,15 @@ export default function TripDetail() {
               <Text style={{ fontFamily: font.bold, fontSize: 12, color: t.primary }}>Change</Text>
             </Pressable>
           </View>
+
+          {trip.locationLat != null && trip.locationLon != null ? (
+            <WeatherCard
+              lat={trip.locationLat}
+              lon={trip.locationLon}
+              startDate={trip.startDate}
+              endDate={trip.endDate}
+            />
+          ) : null}
 
           {mode === 'return' && packed > 0 ? (
             <Pressable
