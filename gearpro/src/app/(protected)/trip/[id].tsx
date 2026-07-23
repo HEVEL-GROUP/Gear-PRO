@@ -106,6 +106,91 @@ export default function TripDetail() {
     return Math.max(item.quantity - elsewhere - otherInThisTrip, 0);
   };
 
+  // The checkbox is the fast path through the two real steps -- plan (reserved)
+  // -> pack (checked_out) -> check in (returned). The other three statuses
+  // (needs_repair/consumed/lost) are exceptions, not part of that flow, so the
+  // checkbox just opens the full status sheet for those instead of guessing.
+  const CHECK_ICON: Record<GearStatus, keyof typeof Ionicons.glyphMap> = {
+    reserved: 'ellipse-outline',
+    checked_out: 'checkmark-circle',
+    returned: 'checkmark-done-circle',
+    needs_repair: 'construct',
+    consumed: 'flame',
+    lost: 'alert-circle',
+  };
+
+  const renderAssignmentRow = (a: (typeof trip.assignments)[number]) => {
+    const item = byId[a.gearId];
+    const expired = isExpiredDate(item?.expiration, today);
+    return (
+      <Card key={a.id} style={{ padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Pressable
+          hitSlop={8}
+          onPress={() => {
+            if (a.status === 'reserved') {
+              updateAssignment(trip.id, a.id, { status: 'checked_out' });
+              tapSuccess();
+            } else if (a.status === 'checked_out') {
+              updateAssignment(trip.id, a.id, { status: 'returned' });
+              tapSuccess();
+            } else {
+              setStatusFor(a.id);
+            }
+          }}>
+          <Ionicons name={CHECK_ICON[a.status]} size={26} color={a.status === 'checked_out' ? t.primary : t.textMuted} />
+        </Pressable>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.text }}>
+            {item ? `${item.brand} ${item.name}` : 'Unknown'}
+          </Text>
+          <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
+            {item?.category} · {((item?.weightLb ?? 0) * a.quantity).toFixed(2)} lb
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+            <Pressable onPress={() => setStatusFor(a.id)}>
+              <Chip label={STATUS_LABELS[a.status]} tone={statusTone(a.status)} />
+            </Pressable>
+            {expired ? <Chip label="Expired" tone="alert" /> : null}
+            {trip.bags.length > 1 ? (
+              <Pressable
+                onPress={() => {
+                  tapLight();
+                  setMoveFor(a.id);
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  borderRadius: 999,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderWidth: 1,
+                  borderColor: t.border,
+                }}>
+                <Ionicons name="swap-horizontal" size={13} color={t.textMuted} />
+                <Text style={{ fontFamily: font.semibold, fontSize: 12, color: t.textMuted }}>Move</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+        <Stepper
+          qty={a.quantity}
+          atMax={a.quantity >= maxQuantityFor(a)}
+          onDec={() =>
+            a.quantity <= 1
+              ? removeAssignment(trip.id, a.id)
+              : updateAssignment(trip.id, a.id, { quantity: a.quantity - 1 })
+          }
+          onInc={() => {
+            if (a.quantity < maxQuantityFor(a)) {
+              updateAssignment(trip.id, a.id, { quantity: a.quantity + 1 });
+            }
+          }}
+        />
+      </Card>
+    );
+  };
+
   return (
     <Screen maxWidth={isWide ? 860 : 720}>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 6, paddingBottom: 12 }}>
@@ -214,6 +299,9 @@ export default function TripDetail() {
 
       {trip.bags.map((bag) => {
         const items = trip.assignments.filter((a) => a.bagId === bag.id);
+        const toPack = items.filter((a) => a.status === 'reserved');
+        const packedItems = items.filter((a) => a.status === 'checked_out');
+        const other = items.filter((a) => a.status !== 'reserved' && a.status !== 'checked_out');
         const bagW = bagWeight(bag.id);
         const over = bagW > bag.maxWeightLb;
         return (
@@ -242,65 +330,29 @@ export default function TripDetail() {
 
             {items.length === 0 ? (
               <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginBottom: 8, paddingLeft: 2 }}>
-                Nothing packed in this bag yet.
+                Nothing planned for this bag yet.
               </Text>
             ) : (
-              items.map((a) => {
-                const item = byId[a.gearId];
-                const expired = isExpiredDate(item?.expiration, today);
-                return (
-                  <Card key={a.id} style={{ padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.text }}>
-                        {item ? `${item.brand} ${item.name}` : 'Unknown'}
-                      </Text>
-                      <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-                        {item?.category} · {((item?.weightLb ?? 0) * a.quantity).toFixed(2)} lb
-                      </Text>
-                      <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                        <Pressable onPress={() => setStatusFor(a.id)}>
-                          <Chip label={STATUS_LABELS[a.status]} tone={statusTone(a.status)} />
-                        </Pressable>
-                        {expired ? <Chip label="Expired" tone="alert" /> : null}
-                        {trip.bags.length > 1 ? (
-                          <Pressable
-                            onPress={() => {
-                              tapLight();
-                              setMoveFor(a.id);
-                            }}
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 4,
-                              borderRadius: 999,
-                              paddingHorizontal: 10,
-                              paddingVertical: 4,
-                              borderWidth: 1,
-                              borderColor: t.border,
-                            }}>
-                            <Ionicons name="swap-horizontal" size={13} color={t.textMuted} />
-                            <Text style={{ fontFamily: font.semibold, fontSize: 12, color: t.textMuted }}>Move</Text>
-                          </Pressable>
-                        ) : null}
-                      </View>
-                    </View>
-                    <Stepper
-                      qty={a.quantity}
-                      atMax={a.quantity >= maxQuantityFor(a)}
-                      onDec={() =>
-                        a.quantity <= 1
-                          ? removeAssignment(trip.id, a.id)
-                          : updateAssignment(trip.id, a.id, { quantity: a.quantity - 1 })
-                      }
-                      onInc={() => {
-                        if (a.quantity < maxQuantityFor(a)) {
-                          updateAssignment(trip.id, a.id, { quantity: a.quantity + 1 });
-                        }
-                      }}
-                    />
-                  </Card>
-                );
-              })
+              <>
+                {toPack.length > 0 ? (
+                  <View style={{ marginBottom: 4 }}>
+                    <RowGroupLabel>To pack · {toPack.length}</RowGroupLabel>
+                    {toPack.map(renderAssignmentRow)}
+                  </View>
+                ) : null}
+                {packedItems.length > 0 ? (
+                  <View style={{ marginBottom: 4 }}>
+                    <RowGroupLabel>Packed · {packedItems.length}</RowGroupLabel>
+                    {packedItems.map(renderAssignmentRow)}
+                  </View>
+                ) : null}
+                {other.length > 0 ? (
+                  <View style={{ marginBottom: 4 }}>
+                    <RowGroupLabel>Returned & issues · {other.length}</RowGroupLabel>
+                    {other.map(renderAssignmentRow)}
+                  </View>
+                ) : null}
+              </>
             )}
 
             <Pressable onPress={() => setAssignBagId(bag.id)}>
@@ -461,6 +513,23 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
         fontSize: 12,
         color: t.softText,
         marginBottom: 8,
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+      }}>
+      {children}
+    </Text>
+  );
+}
+
+function RowGroupLabel({ children }: { children: React.ReactNode }) {
+  const t = useTheme();
+  return (
+    <Text
+      style={{
+        fontFamily: font.semibold,
+        fontSize: 11,
+        color: t.textMuted,
+        marginBottom: 6,
         textTransform: 'uppercase',
         letterSpacing: 0.4,
       }}>
