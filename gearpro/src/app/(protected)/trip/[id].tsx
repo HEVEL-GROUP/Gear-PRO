@@ -10,10 +10,12 @@ import { WeightRing } from '@/components/WeightRing';
 import { tapLight, tapSuccess } from '@/lib/haptics';
 import { font, useTheme } from '@/theme/tokens';
 import {
+  Assignment,
   bagTarget,
   checkedOutElsewhere,
   GearStatus,
   gearMap,
+  groupByCategory,
   isExpiredDate,
   itemCount,
   packedCount,
@@ -137,7 +139,7 @@ export default function TripDetail() {
             {item ? `${item.brand} ${item.name}` : 'Unknown'}
           </Text>
           <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-            {item?.category} · {((item?.weightLb ?? 0) * a.quantity).toFixed(2)} lb
+            {((item?.weightLb ?? 0) * a.quantity).toFixed(2)} lb
           </Text>
           <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             <Pressable onPress={() => setStatusFor(a.id)}>
@@ -205,7 +207,7 @@ export default function TripDetail() {
               {item ? `${item.brand} ${item.name}` : 'Unknown'}
             </Text>
             <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-              {item?.category} · {((item?.weightLb ?? 0) * a.quantity).toFixed(2)} lb
+              {((item?.weightLb ?? 0) * a.quantity).toFixed(2)} lb
               {a.quantity > 1 ? ` · ×${a.quantity}` : ''}
             </Text>
           </View>
@@ -222,6 +224,21 @@ export default function TripDetail() {
         </Card>
       </Pressable>
     );
+  };
+
+  // Groups any assignment list (plan/pack/return) by the gear's category, in
+  // packing-list order, so a bag reads as sections instead of one long list.
+  const renderCategoryGroups = (
+    list: Assignment[],
+    renderRow: (a: Assignment) => React.ReactNode,
+  ) => {
+    const groups = groupByCategory(list, (a) => byId[a.gearId]?.category ?? 'Other');
+    return groups.map(({ category, items: groupItems }) => (
+      <View key={category} style={{ marginBottom: 10 }}>
+        <RowGroupLabel>{category} · {groupItems.length}</RowGroupLabel>
+        {groupItems.map(renderRow)}
+      </View>
+    ));
   };
 
   return (
@@ -370,21 +387,15 @@ export default function TripDetail() {
                 Nothing planned for this bag yet.
               </Text>
             ) : mode === 'plan' ? (
-              <View style={{ marginBottom: 4 }}>{items.map(renderPlanRow)}</View>
+              renderCategoryGroups(items, renderPlanRow)
             ) : mode === 'pack' ? (
               toPack.length > 0 ? (
-                <View style={{ marginBottom: 4 }}>
-                  <RowGroupLabel>To pack · {toPack.length}</RowGroupLabel>
-                  {toPack.map((a) => renderChecklistRow(a, 'pack'))}
-                </View>
+                renderCategoryGroups(toPack, (a) => renderChecklistRow(a, 'pack'))
               ) : (
                 <SuccessRow label="Everything in this bag is packed." />
               )
             ) : packedItems.length > 0 ? (
-              <View style={{ marginBottom: 4 }}>
-                <RowGroupLabel>To return · {packedItems.length}</RowGroupLabel>
-                {packedItems.map((a) => renderChecklistRow(a, 'return'))}
-              </View>
+              renderCategoryGroups(packedItems, (a) => renderChecklistRow(a, 'return'))
             ) : (
               <SuccessRow label="Nothing from this bag needs to come back." />
             )}

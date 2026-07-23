@@ -77,6 +77,24 @@ export const CATEGORIES = [
   'Other',
 ];
 
+// Buckets items by category, ordered to match CATEGORIES (packing-list order,
+// not alphabetical) with any unrecognized category tacked on the end.
+export function groupByCategory<T>(
+  items: T[],
+  getCategory: (item: T) => string,
+): { category: string; items: T[] }[] {
+  const buckets = new Map<string, T[]>();
+  for (const item of items) {
+    const category = getCategory(item) || 'Other';
+    if (!buckets.has(category)) buckets.set(category, []);
+    buckets.get(category)!.push(item);
+  }
+  const extras = [...buckets.keys()].filter((c) => !CATEGORIES.includes(c)).sort();
+  return [...CATEGORIES, ...extras]
+    .filter((c) => buckets.has(c))
+    .map((category) => ({ category, items: buckets.get(category)! }));
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Real UUIDs so local ids can sync 1:1 with Postgres uuid columns. Falls back
