@@ -18,7 +18,7 @@ const PLAN_COPY: Record<Plan, { label: string; price: string; sub: string }> = {
 export default function SubscribeScreen() {
   const t = useTheme();
   const { session, isLoading, signOut } = useAuth();
-  const { isPro, refresh } = usePro();
+  const { isPro, planType, refresh } = usePro();
   const [plan, setPlan] = useState<Plan>('annual');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +31,11 @@ export default function SubscribeScreen() {
     return <Redirect href="/login" />;
   }
 
-  if (isPro) {
+  // isPro is also true mid-trial (a trial grants the same access as a paid
+  // plan), so only bounce people who already have real paid/demo access --
+  // otherwise "Choose a plan" from the You screen would bounce trial users
+  // straight back before they ever see the picker.
+  if (isPro && planType !== 'trial') {
     return <Redirect href="/home" />;
   }
 
