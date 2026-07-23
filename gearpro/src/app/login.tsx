@@ -89,9 +89,15 @@ export default function LoginScreen() {
           <Text style={{ fontFamily: font.bold, fontSize: 13, color: t.primary }}>Create an account</Text>
         </Pressable>
       </View>
-      <Pressable onPress={() => router.push('/privacy')} style={{ marginTop: 14, alignSelf: 'center' }}>
-        <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>Privacy Policy</Text>
-      </Pressable>
+      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 14 }}>
+        <Pressable onPress={() => router.push('/terms')}>
+          <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>Terms of Service</Text>
+        </Pressable>
+        <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>·</Text>
+        <Pressable onPress={() => router.push('/privacy')}>
+          <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>Privacy Policy</Text>
+        </Pressable>
+      </View>
     </Screen>
   );
 }

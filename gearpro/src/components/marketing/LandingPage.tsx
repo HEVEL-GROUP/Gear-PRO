@@ -525,6 +525,15 @@ export function LandingPage() {
               <Eyebrow>COMPANY</Eyebrow>
               <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted }}>Built by Hevel Group</Text>
             </View>
+            <View style={{ flex: 1, gap: 8 }}>
+              <Eyebrow>LEGAL</Eyebrow>
+              <Touchable onPress={() => router.push('/terms')}>
+                <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted }}>Terms of Service</Text>
+              </Touchable>
+              <Touchable onPress={() => router.push('/privacy')}>
+                <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted }}>Privacy Policy</Text>
+              </Touchable>
+            </View>
           </View>
           <View style={{ marginTop: 24 }}>
             <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>
