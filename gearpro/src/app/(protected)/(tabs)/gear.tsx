@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
+import { CategoryFilterSheet } from '@/components/CategoryFilterSheet';
 import { GearFormModal } from '@/components/GearFormModal';
 import { ImportGearSheet } from '@/components/ImportGearSheet';
 import { ManageCategoriesSheet } from '@/components/ManageCategoriesSheet';
@@ -30,13 +31,14 @@ export default function GearScreen() {
   const today = todayStamp();
   const [q, setQ] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [modal, setModal] = useState<{ open: boolean; editId: string | null }>({
+  const [modal, setModal] = useState<{ open: boolean; editId: string | null; notice?: string }>({
     open: false,
     editId: null,
   });
   const [importOpen, setImportOpen] = useState(false);
   const [attentionOpen, setAttentionOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [categoryFilterOpen, setCategoryFilterOpen] = useState(false);
 
   const flaggedCount = useMemo(() => flaggedAssignments(trips).length, [trips]);
 
@@ -44,6 +46,12 @@ export default function GearScreen() {
     () => allCategories.filter((c) => gear.some((g) => g.category === c)),
     [allCategories, gear],
   );
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const g of gear) counts[g.category] = (counts[g.category] ?? 0) + 1;
+    return counts;
+  }, [gear]);
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -105,7 +113,11 @@ export default function GearScreen() {
               onPress={(e) => {
                 e.stopPropagation();
                 if (inUse) {
-                  setModal({ open: true, editId: g.id });
+                  setModal({
+                    open: true,
+                    editId: g.id,
+                    notice: "Can't delete — this item is packed on a trip. Unassign it there first.",
+                  });
                   return;
                 }
                 tapLight();
@@ -181,25 +193,42 @@ export default function GearScreen() {
       </View>
 
       {usedCategories.length > 1 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
-          style={{ marginBottom: 14 }}>
-          <CategoryFilterChip
-            label="All"
-            active={activeCategory === null}
-            onPress={() => setActiveCategory(null)}
-          />
-          {usedCategories.map((c) => (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <Pressable onPress={() => setCategoryFilterOpen(true)} hitSlop={8}>
+            <View
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: radius.pill,
+                backgroundColor: t.surfaceAlt,
+                borderWidth: 1,
+                borderColor: t.border,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <Ionicons name="filter-outline" size={16} color={t.text} />
+            </View>
+          </Pressable>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+            style={{ flex: 1 }}>
             <CategoryFilterChip
-              key={c}
-              label={c}
-              active={activeCategory === c}
-              onPress={() => setActiveCategory(c)}
+              label="All"
+              active={activeCategory === null}
+              onPress={() => setActiveCategory(null)}
             />
-          ))}
-        </ScrollView>
+            {usedCategories.map((c) => (
+              <CategoryFilterChip
+                key={c}
+                label={c}
+                active={activeCategory === c}
+                onPress={() => setActiveCategory(c)}
+              />
+            ))}
+          </ScrollView>
+        </View>
       ) : null}
 
       {groups.length === 0 ? (
@@ -260,11 +289,21 @@ export default function GearScreen() {
       <GearFormModal
         visible={modal.open}
         editId={modal.editId}
+        notice={modal.notice}
         onClose={() => setModal({ open: false, editId: null })}
       />
       <ImportGearSheet visible={importOpen} onClose={() => setImportOpen(false)} />
       <NeedsAttentionSheet visible={attentionOpen} onClose={() => setAttentionOpen(false)} />
       <ManageCategoriesSheet visible={categoriesOpen} onClose={() => setCategoriesOpen(false)} />
+      <CategoryFilterSheet
+        visible={categoryFilterOpen}
+        onClose={() => setCategoryFilterOpen(false)}
+        categories={usedCategories}
+        counts={categoryCounts}
+        totalCount={gear.length}
+        activeCategory={activeCategory}
+        onSelect={setActiveCategory}
+      />
     </Screen>
   );
 }

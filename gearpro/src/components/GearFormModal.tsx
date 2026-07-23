@@ -8,7 +8,7 @@ import { Button, ChipPicker, Field, Label, Sheet } from '@/components/form';
 import { font, useTheme } from '@/theme/tokens';
 import { useGearStore } from '@/store/useGearStore';
 
-type Props = { visible: boolean; onClose: () => void; editId?: string | null };
+type Props = { visible: boolean; onClose: () => void; editId?: string | null; notice?: string };
 
 const blank = {
   brand: '',
@@ -23,7 +23,7 @@ const blank = {
 
 const isValidDate = (s: string) => s === '' || /^\d{4}-\d{2}-\d{2}$/.test(s.trim());
 
-export function GearFormModal({ visible, onClose, editId }: Props) {
+export function GearFormModal({ visible, onClose, editId, notice }: Props) {
   const t = useTheme();
   const gear = useGearStore((s) => s.gear);
   const trips = useGearStore((s) => s.trips);
@@ -104,6 +104,21 @@ export function GearFormModal({ visible, onClose, editId }: Props) {
 
   return (
     <Sheet visible={visible} onClose={onClose} title={editing ? 'Edit gear' : 'Add gear'}>
+      {notice ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            backgroundColor: t.alertSoft,
+            borderRadius: 12,
+            padding: 12,
+            marginBottom: 14,
+          }}>
+          <Ionicons name="alert-circle-outline" size={18} color={t.alertText} />
+          <Text style={{ flex: 1, fontFamily: font.semibold, fontSize: 13, color: t.alertText }}>{notice}</Text>
+        </View>
+      ) : null}
       <Label>Photo</Label>
       {form.photoUri ? (
         <View style={{ marginBottom: 14 }}>
@@ -183,9 +198,20 @@ export function GearFormModal({ visible, onClose, editId }: Props) {
       {editing ? (
         <View style={{ marginTop: 10 }}>
           {inUse ? (
-            <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, textAlign: 'center' }}>
-              Assigned to a trip — remove it there before deleting.
-            </Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+                backgroundColor: t.alertSoft,
+                borderRadius: 12,
+                padding: 12,
+              }}>
+              <Ionicons name="alert-circle-outline" size={18} color={t.alertText} />
+              <Text style={{ flex: 1, fontFamily: font.bold, fontSize: 13, color: t.alertText }}>
+                Can't delete — assigned to a trip. Remove it there first.
+              </Text>
+            </View>
           ) : (
             <Button
               label="Delete gear"
