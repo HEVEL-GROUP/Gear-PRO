@@ -1,5 +1,7 @@
 import {
+  daysUntilExpiration,
   demoDataCounts,
+  expiringGear,
   flaggedAssignments,
   groupByCategory,
   tripLifecycle,
@@ -332,5 +334,44 @@ describe('demoDataCounts', () => {
     ];
     const trips = [{ id: 't1', isDemo: true } as any, { id: 't2' } as any];
     expect(demoDataCounts(gear, trips)).toEqual({ gear: 1, trips: 1 });
+  });
+});
+
+describe('daysUntilExpiration', () => {
+  it('is negative for a past date, positive for future, 0 for today, null for missing', () => {
+    expect(daysUntilExpiration('2026-07-13', TODAY)).toBe(-10);
+    expect(daysUntilExpiration('2026-08-02', TODAY)).toBe(10);
+    expect(daysUntilExpiration('2026-07-23', TODAY)).toBe(0);
+    expect(daysUntilExpiration(undefined, TODAY)).toBeNull();
+    expect(daysUntilExpiration('not-a-date', TODAY)).toBeNull();
+  });
+});
+
+describe('expiringGear', () => {
+  const mk = (id: string, expiration?: string) =>
+    ({ id, brand: 'B', name: id, category: 'Safety', weightLb: 1, quantity: 1, expiration } as any);
+
+  it('includes expired + within-90-days, excludes far-future and no-date, sorted soonest first', () => {
+    const gear = [
+      mk('far', '2027-01-01'), // >90 days out -> excluded
+      mk('soon', '2026-09-01'), // ~40 days -> included
+      mk('expired', '2026-06-01'), // already expired -> included
+      mk('none'), // no date -> excluded
+      mk('edge', '2026-10-21'), // 90 days -> included (boundary)
+    ];
+    const result = expiringGear(gear, TODAY).map((g) => g.id);
+    expect(result).toEqual(['expired', 'soon', 'edge']);
+  });
+});
+
+describe('syncDirty flag', () => {
+  beforeEach(() => useGearStore.getState().resetLocal());
+
+  it('defaults clean after resetLocal and toggles via setSyncDirty', () => {
+    expect(useGearStore.getState().syncDirty).toBe(false);
+    useGearStore.getState().setSyncDirty(true);
+    expect(useGearStore.getState().syncDirty).toBe(true);
+    useGearStore.getState().resetLocal();
+    expect(useGearStore.getState().syncDirty).toBe(false);
   });
 });

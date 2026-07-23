@@ -210,6 +210,13 @@ type StoreState = {
   trips: Trip[];
   categories: string[];
   customCategories: string[];
+  // True when local gear/trips have edits not yet confirmed-uploaded to the
+  // cloud. Persisted so it survives a reload/relaunch: if an edit is made
+  // offline (or the push fails) and the app is closed, this stays true and the
+  // next login pushes-before-pulling instead of letting the cloud overwrite the
+  // unsynced work. Cleared only after a verified successful push or a pull.
+  syncDirty: boolean;
+  setSyncDirty: (v: boolean) => void;
   addCategory: (name: string) => void;
   renameCategory: (oldName: string, newName: string) => void;
   removeCategory: (name: string) => void;
@@ -237,6 +244,8 @@ export const useGearStore = create<StoreState>()(
       trips: seedTrips(),
       categories: CATEGORIES,
       customCategories: [],
+      syncDirty: false,
+      setSyncDirty: (v) => set({ syncDirty: v }),
       // Custom categories tack onto the fixed CATEGORIES list (kept in sync
       // via `categories`, which is what every picker/grouping reads from) --
       // matching case-insensitively against a name that already exists is a
@@ -303,6 +312,7 @@ export const useGearStore = create<StoreState>()(
           trips: seedTrips(),
           categories: CATEGORIES,
           customCategories: [],
+          syncDirty: false,
         }),
       addGear: (item) => set((s) => ({ gear: [...s.gear, { ...item, id: uid() }] })),
       updateGear: (id, patch) =>
@@ -504,6 +514,32 @@ export function remainingToAssign(item: GearItem, trips: Trip[], trip: Trip): nu
 export function isExpiredDate(dateStr: string | undefined, today: string): boolean {
   if (!dateStr) return false;
   return dateStr < today;
+}
+
+const YMD = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+// Whole days until the given YYYY-MM-DD (negative if already past); null if the
+// date is missing/unparseable. TZ-safe (compares calendar days via Date.UTC).
+export function daysUntilExpiration(dateStr: string | undefined, today: string): number | null {
+  if (!dateStr) return null;
+  const a = YMD.exec(dateStr);
+  const b = YMD.exec(today);
+  if (!a || !b) return null;
+  const target = Date.UTC(Number(a[1]), Number(a[2]) - 1, Number(a[3]));
+  const base = Date.UTC(Number(b[1]), Number(b[2]) - 1, Number(b[3]));
+  return Math.round((target - base) / 86_400_000);
+}
+
+// Gear that is already expired OR expires within `withinDays` (default ~3
+// months) -- the "needs attention" set surfaced on the Gear screen, soonest
+// first so the most urgent is on top.
+export function expiringGear(gear: GearItem[], today: string, withinDays = 90): GearItem[] {
+  return gear
+    .filter((g) => {
+      const d = daysUntilExpiration(g.expiration, today);
+      return d !== null && d <= withinDays;
+    })
+    .sort((x, y) => (x.expiration! < y.expiration! ? -1 : x.expiration! > y.expiration! ? 1 : 0));
 }
 
 // Every currently-packed (checked_out) assignment across all trips, newest trip first.
