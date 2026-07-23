@@ -44,6 +44,22 @@ const LIFECYCLE_META: Record<TripLifecycle, { label: string; tone: ChipTone }> =
   closed: { label: 'Closed', tone: 'neutral' },
 };
 
+type Mode = 'plan' | 'pack' | 'return';
+
+const MODE_META: Record<Mode, { label: string; icon: keyof typeof Ionicons.glyphMap; subtitle: string }> = {
+  plan: { label: 'Plan', icon: 'create-outline', subtitle: 'Decide what goes in each bag.' },
+  pack: { label: 'Pack', icon: 'bag-handle-outline', subtitle: "Tap an item once it's in the bag." },
+  return: { label: 'Return', icon: 'arrow-undo-outline', subtitle: "Tap an item once it's checked back in." },
+};
+
+// Opens on the phase the trip is actually in, so you land on the right screen
+// instead of always starting over at Plan.
+function defaultModeForLifecycle(lifecycle: TripLifecycle): Mode {
+  if (lifecycle === 'needs_return') return 'return';
+  if (lifecycle === 'active') return 'pack';
+  return 'plan';
+}
+
 export default function TripDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -70,6 +86,9 @@ export default function TripDetail() {
     open: false,
     bagId: null,
   });
+  const [mode, setMode] = useState<Mode>(() =>
+    trip ? defaultModeForLifecycle(tripLifecycle(trip, todayStamp())) : 'plan',
+  );
 
   if (!trip) {
     return (
@@ -106,39 +125,13 @@ export default function TripDetail() {
     return Math.max(item.quantity - elsewhere - otherInThisTrip, 0);
   };
 
-  // The checkbox is the fast path through the two real steps -- plan (reserved)
-  // -> pack (checked_out) -> check in (returned). The other three statuses
-  // (needs_repair/consumed/lost) are exceptions, not part of that flow, so the
-  // checkbox just opens the full status sheet for those instead of guessing.
-  const CHECK_ICON: Record<GearStatus, keyof typeof Ionicons.glyphMap> = {
-    reserved: 'ellipse-outline',
-    checked_out: 'checkmark-circle',
-    returned: 'checkmark-done-circle',
-    needs_repair: 'construct',
-    consumed: 'flame',
-    lost: 'alert-circle',
-  };
-
-  const renderAssignmentRow = (a: (typeof trip.assignments)[number]) => {
+  // Plan mode: a flat, editable list -- every assignment regardless of status,
+  // with quantity/move/remove controls. Not a checklist, so no tap-to-advance.
+  const renderPlanRow = (a: (typeof trip.assignments)[number]) => {
     const item = byId[a.gearId];
     const expired = isExpiredDate(item?.expiration, today);
     return (
       <Card key={a.id} style={{ padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <Pressable
-          hitSlop={8}
-          onPress={() => {
-            if (a.status === 'reserved') {
-              updateAssignment(trip.id, a.id, { status: 'checked_out' });
-              tapSuccess();
-            } else if (a.status === 'checked_out') {
-              updateAssignment(trip.id, a.id, { status: 'returned' });
-              tapSuccess();
-            } else {
-              setStatusFor(a.id);
-            }
-          }}>
-          <Ionicons name={CHECK_ICON[a.status]} size={26} color={a.status === 'checked_out' ? t.primary : t.textMuted} />
-        </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.text }}>
             {item ? `${item.brand} ${item.name}` : 'Unknown'}
@@ -191,6 +184,46 @@ export default function TripDetail() {
     );
   };
 
+  // Pack/Return modes: a shrinking checklist -- tap an item to advance it
+  // (reserved -> checked_out for 'pack', checked_out -> returned for 'return')
+  // and it drops off the list. Return rows get a small overflow to reroute an
+  // item to needs_repair/consumed/lost instead of a clean return.
+  const renderChecklistRow = (a: (typeof trip.assignments)[number], kind: 'pack' | 'return') => {
+    const item = byId[a.gearId];
+    const nextStatus: GearStatus = kind === 'pack' ? 'checked_out' : 'returned';
+    return (
+      <Pressable
+        key={a.id}
+        onPress={() => {
+          updateAssignment(trip.id, a.id, { status: nextStatus });
+          tapSuccess();
+        }}>
+        <Card style={{ padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Ionicons name="ellipse-outline" size={24} color={t.textMuted} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.text }}>
+              {item ? `${item.brand} ${item.name}` : 'Unknown'}
+            </Text>
+            <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
+              {item?.category} · {((item?.weightLb ?? 0) * a.quantity).toFixed(2)} lb
+              {a.quantity > 1 ? ` · ×${a.quantity}` : ''}
+            </Text>
+          </View>
+          {kind === 'return' ? (
+            <Pressable
+              hitSlop={8}
+              onPress={(e) => {
+                e.stopPropagation();
+                setStatusFor(a.id);
+              }}>
+              <Ionicons name="ellipsis-horizontal" size={20} color={t.textMuted} />
+            </Pressable>
+          ) : null}
+        </Card>
+      </Pressable>
+    );
+  };
+
   return (
     <Screen maxWidth={isWide ? 860 : 720}>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 6, paddingBottom: 12 }}>
@@ -215,7 +248,12 @@ export default function TripDetail() {
         </Pressable>
       </View>
 
-      {packed > 0 ? (
+      <ModeSwitch mode={mode} onChange={setMode} />
+      <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: -8, marginBottom: 16 }}>
+        {MODE_META[mode].subtitle}
+      </Text>
+
+      {mode === 'return' && packed > 0 ? (
         <Pressable
           onPress={() => {
             returnTrip(trip.id);
@@ -301,7 +339,6 @@ export default function TripDetail() {
         const items = trip.assignments.filter((a) => a.bagId === bag.id);
         const toPack = items.filter((a) => a.status === 'reserved');
         const packedItems = items.filter((a) => a.status === 'checked_out');
-        const other = items.filter((a) => a.status !== 'reserved' && a.status !== 'checked_out');
         const bagW = bagWeight(bag.id);
         const over = bagW > bag.maxWeightLb;
         return (
@@ -332,65 +369,66 @@ export default function TripDetail() {
               <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginBottom: 8, paddingLeft: 2 }}>
                 Nothing planned for this bag yet.
               </Text>
+            ) : mode === 'plan' ? (
+              <View style={{ marginBottom: 4 }}>{items.map(renderPlanRow)}</View>
+            ) : mode === 'pack' ? (
+              toPack.length > 0 ? (
+                <View style={{ marginBottom: 4 }}>
+                  <RowGroupLabel>To pack · {toPack.length}</RowGroupLabel>
+                  {toPack.map((a) => renderChecklistRow(a, 'pack'))}
+                </View>
+              ) : (
+                <SuccessRow label="Everything in this bag is packed." />
+              )
+            ) : packedItems.length > 0 ? (
+              <View style={{ marginBottom: 4 }}>
+                <RowGroupLabel>To return · {packedItems.length}</RowGroupLabel>
+                {packedItems.map((a) => renderChecklistRow(a, 'return'))}
+              </View>
             ) : (
-              <>
-                {toPack.length > 0 ? (
-                  <View style={{ marginBottom: 4 }}>
-                    <RowGroupLabel>To pack · {toPack.length}</RowGroupLabel>
-                    {toPack.map(renderAssignmentRow)}
-                  </View>
-                ) : null}
-                {packedItems.length > 0 ? (
-                  <View style={{ marginBottom: 4 }}>
-                    <RowGroupLabel>Packed · {packedItems.length}</RowGroupLabel>
-                    {packedItems.map(renderAssignmentRow)}
-                  </View>
-                ) : null}
-                {other.length > 0 ? (
-                  <View style={{ marginBottom: 4 }}>
-                    <RowGroupLabel>Returned & issues · {other.length}</RowGroupLabel>
-                    {other.map(renderAssignmentRow)}
-                  </View>
-                ) : null}
-              </>
+              <SuccessRow label="Nothing from this bag needs to come back." />
             )}
 
-            <Pressable onPress={() => setAssignBagId(bag.id)}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: t.border,
-                  borderStyle: 'dashed',
-                  paddingVertical: 12,
-                }}>
-                <Ionicons name="add" size={18} color={t.primary} />
-                <Text style={{ fontFamily: font.bold, color: t.primary, fontSize: 14 }}>Add gear to {bag.label}</Text>
-              </View>
-            </Pressable>
+            {mode === 'plan' ? (
+              <Pressable onPress={() => setAssignBagId(bag.id)}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: t.border,
+                    borderStyle: 'dashed',
+                    paddingVertical: 12,
+                  }}>
+                  <Ionicons name="add" size={18} color={t.primary} />
+                  <Text style={{ fontFamily: font.bold, color: t.primary, fontSize: 14 }}>Add gear to {bag.label}</Text>
+                </View>
+              </Pressable>
+            ) : null}
           </View>
         );
       })}
 
-      <Pressable onPress={() => setBagEdit({ open: true, bagId: null })}>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            borderRadius: 14,
-            backgroundColor: t.soft,
-            paddingVertical: 14,
-          }}>
-          <Ionicons name="add" size={18} color={t.softText} />
-          <Text style={{ fontFamily: font.bold, color: t.softText, fontSize: 14 }}>Add another bag</Text>
-        </View>
-      </Pressable>
+      {mode === 'plan' ? (
+        <Pressable onPress={() => setBagEdit({ open: true, bagId: null })}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              borderRadius: 14,
+              backgroundColor: t.soft,
+              paddingVertical: 14,
+            }}>
+            <Ionicons name="add" size={18} color={t.softText} />
+            <Text style={{ fontFamily: font.bold, color: t.softText, fontSize: 14 }}>Add another bag</Text>
+          </View>
+        </Pressable>
+      ) : null}
 
       <Sheet visible={!!assignBagId} onClose={() => setAssignBagId(null)} title="Add gear">
         {gear.map((item) => {
@@ -501,6 +539,59 @@ export default function TripDetail() {
         onClose={() => setBagEdit({ open: false, bagId: null })}
       />
     </Screen>
+  );
+}
+
+function ModeSwitch({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
+  const t = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', backgroundColor: t.track, borderRadius: 14, padding: 4 }}>
+      {(Object.keys(MODE_META) as Mode[]).map((key) => {
+        const active = mode === key;
+        return (
+          <Pressable
+            key={key}
+            onPress={() => {
+              tapLight();
+              onChange(key);
+            }}
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              paddingVertical: 10,
+              borderRadius: 10,
+              backgroundColor: active ? t.surface : 'transparent',
+            }}>
+            <Ionicons name={MODE_META[key].icon} size={15} color={active ? t.primary : t.textMuted} />
+            <Text style={{ fontFamily: font.bold, fontSize: 13, color: active ? t.text : t.textMuted }}>
+              {MODE_META[key].label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function SuccessRow({ label }: { label: string }) {
+  const t = useTheme();
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: t.soft,
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 8,
+      }}>
+      <Ionicons name="checkmark-circle" size={18} color={t.softText} />
+      <Text style={{ fontFamily: font.semibold, fontSize: 13, color: t.softText }}>{label}</Text>
+    </View>
   );
 }
 
