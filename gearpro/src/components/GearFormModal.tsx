@@ -28,6 +28,7 @@ export function GearFormModal({ visible, onClose, editId }: Props) {
   const gear = useGearStore((s) => s.gear);
   const trips = useGearStore((s) => s.trips);
   const categories = useGearStore((s) => s.categories);
+  const addCategory = useGearStore((s) => s.addCategory);
   const addGear = useGearStore((s) => s.addGear);
   const updateGear = useGearStore((s) => s.updateGear);
   const removeGear = useGearStore((s) => s.removeGear);
@@ -151,6 +152,7 @@ export function GearFormModal({ visible, onClose, editId }: Props) {
         value={form.category}
         options={categories}
         onChange={(v) => setForm((f) => ({ ...f, category: v }))}
+        onAddCustom={addCategory}
       />
 
       <View style={{ flexDirection: 'row', gap: 12 }}>

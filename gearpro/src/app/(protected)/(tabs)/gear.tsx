@@ -4,15 +4,17 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 import { GearFormModal } from '@/components/GearFormModal';
+import { ImportGearSheet } from '@/components/ImportGearSheet';
 import { Card, Chip, Display, Screen, Touchable } from '@/components/ui';
 import { font, radius, useTheme } from '@/theme/tokens';
-import { CATEGORIES, GearItem, groupByCategory, isExpiredDate, todayStamp, useGearStore } from '@/store/useGearStore';
+import { GearItem, groupByCategory, isExpiredDate, todayStamp, useGearStore } from '@/store/useGearStore';
 
 export default function GearScreen() {
   const t = useTheme();
   const { width } = useWindowDimensions();
   const isWide = width >= 880;
   const gear = useGearStore((s) => s.gear);
+  const allCategories = useGearStore((s) => s.categories);
   const today = todayStamp();
   const [q, setQ] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -20,10 +22,11 @@ export default function GearScreen() {
     open: false,
     editId: null,
   });
+  const [importOpen, setImportOpen] = useState(false);
 
   const usedCategories = useMemo(
-    () => CATEGORIES.filter((c) => gear.some((g) => g.category === c)),
-    [gear],
+    () => allCategories.filter((c) => gear.some((g) => g.category === c)),
+    [allCategories, gear],
   );
 
   const filtered = useMemo(() => {
@@ -84,11 +87,16 @@ export default function GearScreen() {
 
   return (
     <Screen maxWidth={isWide ? 860 : 720}>
-      <View style={{ paddingTop: 8, paddingBottom: 12 }}>
-        <Display style={{ fontSize: 26 }}>Gear library</Display>
-        <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginTop: 4 }}>
-          {gear.length} items · {totalWeight.toFixed(1)} lb owned
-        </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingTop: 8, paddingBottom: 12 }}>
+        <View style={{ flex: 1 }}>
+          <Display style={{ fontSize: 26 }}>Gear library</Display>
+          <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginTop: 4 }}>
+            {gear.length} items · {totalWeight.toFixed(1)} lb owned
+          </Text>
+        </View>
+        <Pressable onPress={() => setImportOpen(true)} hitSlop={10} style={{ padding: 6, marginTop: 2 }}>
+          <Ionicons name="cloud-upload-outline" size={22} color={t.primary} />
+        </Pressable>
       </View>
 
       <View
@@ -196,6 +204,7 @@ export default function GearScreen() {
         editId={modal.editId}
         onClose={() => setModal({ open: false, editId: null })}
       />
+      <ImportGearSheet visible={importOpen} onClose={() => setImportOpen(false)} />
     </Screen>
   );
 }

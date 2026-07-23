@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import {
   KeyboardTypeOptions,
   Modal,
@@ -146,17 +146,34 @@ export function ChipPicker({
   value,
   options,
   onChange,
+  onAddCustom,
 }: {
   label: string;
   value: string;
   options: string[];
   onChange: (v: string) => void;
+  // When set, a trailing "+ Add" chip lets the user type a brand-new option
+  // (a custom category) instead of being limited to the fixed list.
+  onAddCustom?: (name: string) => void;
 }) {
   const t = useTheme();
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed) {
+      onAddCustom?.(trimmed);
+      onChange(trimmed);
+    }
+    setDraft('');
+    setAdding(false);
+  };
+
   return (
     <View style={{ marginBottom: 14 }}>
       <Label>{label}</Label>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
         {options.map((opt) => {
           const on = opt === value;
           return (
@@ -178,6 +195,68 @@ export function ChipPicker({
             </Pressable>
           );
         })}
+        {onAddCustom ? (
+          adding ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                backgroundColor: t.surface,
+                borderWidth: 1,
+                borderColor: t.border,
+                borderRadius: 999,
+                paddingLeft: 13,
+                paddingRight: 6,
+                paddingVertical: 4,
+              }}>
+              <TextInput
+                value={draft}
+                onChangeText={setDraft}
+                onSubmitEditing={commit}
+                autoFocus
+                placeholder="New category"
+                placeholderTextColor={t.textMuted}
+                style={{
+                  fontFamily: font.semibold,
+                  fontSize: 13,
+                  color: t.text,
+                  minWidth: 90,
+                  paddingVertical: 4,
+                }}
+              />
+              <Pressable onPress={commit} hitSlop={8}>
+                <Ionicons name="checkmark-circle" size={22} color={t.primary} />
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  setDraft('');
+                  setAdding(false);
+                }}
+                hitSlop={8}>
+                <Ionicons name="close-circle" size={22} color={t.textMuted} />
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable onPress={() => setAdding(true)}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  paddingHorizontal: 13,
+                  paddingVertical: 8,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: t.border,
+                  borderStyle: 'dashed',
+                }}>
+                <Ionicons name="add" size={14} color={t.primary} />
+                <Text style={{ fontFamily: font.semibold, fontSize: 13, color: t.primary }}>Add</Text>
+              </View>
+            </Pressable>
+          )
+        ) : null}
       </View>
     </View>
   );
