@@ -5,9 +5,11 @@ import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 
 import { Button } from '@/components/form';
 import { ClearDemoDataSheet } from '@/components/ClearDemoDataSheet';
+import { DeleteAccountSheet } from '@/components/DeleteAccountSheet';
 import { Mark } from '@/components/Mark';
 import { Card, Display, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { exportData } from '@/lib/export';
 import { tapLight } from '@/lib/haptics';
 import { openBillingPortal } from '@/lib/stripe/checkout';
 import { usePro } from '@/lib/stripe/usePro';
@@ -52,9 +54,12 @@ export default function YouScreen() {
   const { planType, trialEndsAt } = usePro();
   const gear = useGearStore((s) => s.gear);
   const trips = useGearStore((s) => s.trips);
+  const resetLocal = useGearStore((s) => s.resetLocal);
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [demoSheetOpen, setDemoSheetOpen] = useState(false);
+  const [deleteSheetOpen, setDeleteSheetOpen] = useState(false);
 
   const isTrial = planType === 'trial';
   const demoCounts = useMemo(() => demoDataCounts(gear, trips), [gear, trips]);
@@ -94,8 +99,22 @@ export default function YouScreen() {
         <View style={{ height: 1, backgroundColor: t.border }} />
         <Row icon="cloud-upload-outline" title="Cloud sync" subtitle="Your data syncs automatically across every device you log into" />
         <View style={{ height: 1, backgroundColor: t.border }} />
-        <Row icon="download-outline" title="Backup & export" subtitle="Save a copy of your data — coming soon" />
+        <Pressable
+          onPress={async () => {
+            setExportError(null);
+            try {
+              tapLight();
+              await exportData();
+            } catch (err) {
+              setExportError(err instanceof Error ? err.message : 'Export failed');
+            }
+          }}>
+          <Row icon="download-outline" title="Backup & export" subtitle="Download a copy of your gear and trips as JSON" />
+        </Pressable>
       </Card>
+      {exportError && (
+        <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.alert, marginTop: 6 }}>{exportError}</Text>
+      )}
 
       <View style={{ height: 12 }} />
 
@@ -156,6 +175,7 @@ export default function YouScreen() {
         onPress={async () => {
           tapLight();
           await signOut();
+          resetLocal();
           router.replace('/');
         }}>
         <View
@@ -169,11 +189,16 @@ export default function YouScreen() {
         </View>
       </Pressable>
 
+      <Pressable onPress={() => setDeleteSheetOpen(true)} style={{ marginTop: 20, alignSelf: 'center' }}>
+        <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted }}>Delete account</Text>
+      </Pressable>
+
       <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, textAlign: 'center', marginTop: 16 }}>
         Gear Pro v2 · web preview
       </Text>
 
       <ClearDemoDataSheet visible={demoSheetOpen} onClose={() => setDemoSheetOpen(false)} />
+      <DeleteAccountSheet visible={deleteSheetOpen} onClose={() => setDeleteSheetOpen(false)} />
     </Screen>
   );
 }

@@ -269,11 +269,13 @@ export function Button({
   onPress,
   tone = 'primary',
   icon,
+  disabled = false,
 }: {
   label: string;
   onPress: () => void;
   tone?: ButtonTone;
   icon?: ReactNode;
+  disabled?: boolean;
 }) {
   const t = useTheme();
   const bg = tone === 'primary' ? t.primary : 'transparent';
@@ -281,11 +283,15 @@ export function Button({
   const borderColor = tone === 'danger' ? t.alert : t.border;
   return (
     <Pressable
+      disabled={disabled}
       onPress={() => {
         tapLight();
         onPress();
       }}
-      style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] })}>
+      style={({ pressed }) => ({
+        opacity: disabled ? 0.5 : pressed ? 0.9 : 1,
+        transform: [{ scale: pressed && !disabled ? 0.985 : 1 }],
+      })}>
       <View
         style={{
           flexDirection: 'row',

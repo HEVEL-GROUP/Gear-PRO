@@ -62,7 +62,8 @@ export default function PrivacyScreen() {
 
       <Section title="Deleting your data">
         You can delete individual gear items and trips at any time in the app. To delete your account and
-        all associated data entirely, email us at the address below.
+        all associated data entirely, go to the You screen and use "Delete account" -- this is permanent
+        and can't be undone.
       </Section>
 
       <Section title="Children">

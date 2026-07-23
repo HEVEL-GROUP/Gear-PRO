@@ -214,6 +214,7 @@ type StoreState = {
   renameCategory: (oldName: string, newName: string) => void;
   removeCategory: (name: string) => void;
   clearDemoData: () => void;
+  resetLocal: () => void;
   addGear: (item: Omit<GearItem, 'id'>) => void;
   updateGear: (id: string, patch: Partial<GearItem>) => void;
   removeGear: (id: string) => void;
@@ -291,6 +292,17 @@ export const useGearStore = create<StoreState>()(
                 assignments: t.assignments.filter((a) => !demoGearIds.has(a.gearId)),
               })),
           };
+        }),
+      // Reseeds this device back to factory-fresh state -- run on sign-out (and
+      // before account deletion) so a second account signing in on the same
+      // device never has the first account's local cache treated as "this
+      // device's data" by syncOnLogin's first-sync remap-and-upload path.
+      resetLocal: () =>
+        set({
+          gear: seedGear,
+          trips: seedTrips(),
+          categories: CATEGORIES,
+          customCategories: [],
         }),
       addGear: (item) => set((s) => ({ gear: [...s.gear, { ...item, id: uid() }] })),
       updateGear: (id, patch) =>
