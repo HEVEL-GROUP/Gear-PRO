@@ -88,9 +88,10 @@ export default function TripDetail() {
     open: false,
     bagId: null,
   });
-  const [mode, setMode] = useState<Mode>(() =>
-    trip ? defaultModeForLifecycle(tripLifecycle(trip, todayStamp())) : 'plan',
-  );
+  // Null until the user picks a mode for this visit -- re-asked every time
+  // you open a trip, since the right answer depends on where you are in the
+  // trip (deciding what goes, actively packing, or checking gear back in).
+  const [mode, setMode] = useState<Mode | null>(null);
 
   if (!trip) {
     return (
@@ -265,220 +266,268 @@ export default function TripDetail() {
         </Pressable>
       </View>
 
-      <ModeSwitch mode={mode} onChange={setMode} />
-      <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: -8, marginBottom: 16 }}>
-        {MODE_META[mode].subtitle}
-      </Text>
-
-      {mode === 'return' && packed > 0 ? (
-        <Pressable
-          onPress={() => {
-            returnTrip(trip.id);
-            tapSuccess();
-          }}
-          style={{ marginBottom: 16 }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 10,
-              backgroundColor: lifecycle === 'needs_return' ? t.alertSoft : t.soft,
-              borderRadius: 14,
-              padding: 14,
-            }}>
-            <Ionicons
-              name="arrow-undo-circle-outline"
-              size={22}
-              color={lifecycle === 'needs_return' ? t.alertText : t.softText}
-            />
-            <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  fontFamily: font.bold,
-                  fontSize: 14,
-                  color: lifecycle === 'needs_return' ? t.alertText : t.softText,
-                }}>
-                {lifecycle === 'needs_return' ? "Trip's over — check gear back in" : 'Return trip'}
-              </Text>
-              <Text
-                style={{
-                  fontFamily: font.medium,
-                  fontSize: 12,
-                  color: lifecycle === 'needs_return' ? t.alertText : t.textMuted,
-                  marginTop: 1,
-                }}>
-                Marks {packed} packed item{packed === 1 ? '' : 's'} as returned
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={lifecycle === 'needs_return' ? t.alertText : t.softText} />
-          </View>
-        </Pressable>
-      ) : null}
-
-      <Card>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
-          <WeightRing value={total} target={target} />
-          <View style={{ flex: 1, gap: 12 }}>
-            <Stat label="Pack weight" value={`${total.toFixed(1)} lb`} color={t.text} />
-            <Stat label="Total capacity" value={`${target} lb`} color={t.primary} />
-            <Stat label={`${trip.bags.length} bags · items`} value={`${itemCount(trip)}`} color={t.text} />
-          </View>
-        </View>
-      </Card>
-
-      {trip.bags.length > 1 && total > 0 ? (
-        <View style={{ marginTop: 16 }}>
-          <SectionLabel>Load by bag</SectionLabel>
-          <View style={{ height: 14, borderRadius: 999, overflow: 'hidden', flexDirection: 'row', backgroundColor: t.track }}>
-            {trip.bags.map((bag) => {
-              const w = bagWeight(bag.id);
-              return w > 0 ? (
-                <View key={bag.id} style={{ width: `${(w / total) * 100}%`, backgroundColor: bag.color }} />
-              ) : null;
-            })}
-          </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 10 }}>
-            {trip.bags.map((bag) => (
-              <View key={bag.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: bag.color }} />
-                <Text style={{ fontFamily: font.semibold, fontSize: 12, color: t.textMuted }}>
-                  {bag.label} · {bagWeight(bag.id).toFixed(1)} lb
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      ) : null}
-
-      <View style={{ height: 16 }} />
-
-      {trip.bags.map((bag) => {
-        const items = trip.assignments.filter((a) => a.bagId === bag.id);
-        const toPack = items.filter((a) => a.status === 'reserved');
-        const packedItems = items.filter((a) => a.status === 'checked_out');
-        const bagW = bagWeight(bag.id);
-        const over = bagW > bag.maxWeightLb;
-        return (
-          <View key={bag.id} style={{ marginBottom: 18 }}>
-            <Pressable
-              onPress={() => setBagEdit({ open: true, bagId: bag.id })}
-              style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-              <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: bag.color, marginRight: 8 }} />
-              <Text style={{ fontFamily: font.bold, fontSize: 16, color: t.text, flex: 1 }}>{bag.label}</Text>
-              <Text style={{ fontFamily: font.semibold, fontSize: 13, color: over ? t.alert : t.textMuted, marginRight: 6 }}>
-                {bagW.toFixed(1)} / {bag.maxWeightLb} lb
-              </Text>
-              <Ionicons name="ellipsis-horizontal" size={18} color={t.textMuted} />
+      {mode === null ? (
+        <ModeChooser suggested={defaultModeForLifecycle(lifecycle)} onChoose={setMode} />
+      ) : (
+        <>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+            <Ionicons name={MODE_META[mode].icon} size={15} color={t.primary} />
+            <Text style={{ fontFamily: font.bold, fontSize: 13, color: t.text, marginLeft: 6 }}>
+              {MODE_META[mode].label} mode
+            </Text>
+            <Text
+              style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginLeft: 6, flex: 1 }}
+              numberOfLines={1}>
+              · {MODE_META[mode].subtitle}
+            </Text>
+            <Pressable onPress={() => setMode(null)} hitSlop={8}>
+              <Text style={{ fontFamily: font.bold, fontSize: 12, color: t.primary }}>Change</Text>
             </Pressable>
+          </View>
 
-            <View style={{ height: 6, borderRadius: 999, backgroundColor: t.track, overflow: 'hidden', marginBottom: 12 }}>
+          {mode === 'return' && packed > 0 ? (
+            <Pressable
+              onPress={() => {
+                returnTrip(trip.id);
+                tapSuccess();
+              }}
+              style={{ marginBottom: 16 }}>
               <View
                 style={{
-                  height: 6,
-                  borderRadius: 999,
-                  width: `${Math.min(100, bag.maxWeightLb > 0 ? (bagW / bag.maxWeightLb) * 100 : 0)}%`,
-                  backgroundColor: over ? t.alert : bag.color,
-                }}
-              />
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  backgroundColor: lifecycle === 'needs_return' ? t.alertSoft : t.soft,
+                  borderRadius: 14,
+                  padding: 14,
+                }}>
+                <Ionicons
+                  name="arrow-undo-circle-outline"
+                  size={22}
+                  color={lifecycle === 'needs_return' ? t.alertText : t.softText}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontFamily: font.bold,
+                      fontSize: 14,
+                      color: lifecycle === 'needs_return' ? t.alertText : t.softText,
+                    }}>
+                    {lifecycle === 'needs_return' ? "Trip's over — check gear back in" : 'Return trip'}
+                  </Text>
+                  <Text
+                    style={{
+                      fontFamily: font.medium,
+                      fontSize: 12,
+                      color: lifecycle === 'needs_return' ? t.alertText : t.textMuted,
+                      marginTop: 1,
+                    }}>
+                    Marks {packed} packed item{packed === 1 ? '' : 's'} as returned
+                  </Text>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={lifecycle === 'needs_return' ? t.alertText : t.softText}
+                />
+              </View>
+            </Pressable>
+          ) : null}
+
+          <Card>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+              <WeightRing value={total} target={target} />
+              <View style={{ flex: 1, gap: 12 }}>
+                <Stat label="Pack weight" value={`${total.toFixed(1)} lb`} color={t.text} />
+                <Stat label="Total capacity" value={`${target} lb`} color={t.primary} />
+                <Stat label={`${trip.bags.length} bags · items`} value={`${itemCount(trip)}`} color={t.text} />
+              </View>
             </View>
+          </Card>
 
-            {items.length === 0 ? (
-              <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginBottom: 8, paddingLeft: 2 }}>
-                Nothing planned for this bag yet.
-              </Text>
-            ) : mode === 'plan' ? (
-              renderCategoryGroups(items, renderPlanRow)
-            ) : mode === 'pack' ? (
-              toPack.length > 0 ? (
-                renderCategoryGroups(toPack, (a) => renderChecklistRow(a, 'pack'))
-              ) : (
-                <SuccessRow label="Everything in this bag is packed." />
-              )
-            ) : packedItems.length > 0 ? (
-              renderCategoryGroups(packedItems, (a) => renderChecklistRow(a, 'return'))
-            ) : (
-              <SuccessRow label="Nothing from this bag needs to come back." />
-            )}
+          {trip.bags.length > 1 && total > 0 ? (
+            <View style={{ marginTop: 16 }}>
+              <SectionLabel>Load by bag</SectionLabel>
+              <View
+                style={{
+                  height: 14,
+                  borderRadius: 999,
+                  overflow: 'hidden',
+                  flexDirection: 'row',
+                  backgroundColor: t.track,
+                }}>
+                {trip.bags.map((bag) => {
+                  const w = bagWeight(bag.id);
+                  return w > 0 ? (
+                    <View key={bag.id} style={{ width: `${(w / total) * 100}%`, backgroundColor: bag.color }} />
+                  ) : null;
+                })}
+              </View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 10 }}>
+                {trip.bags.map((bag) => (
+                  <View key={bag.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: bag.color }} />
+                    <Text style={{ fontFamily: font.semibold, fontSize: 12, color: t.textMuted }}>
+                      {bag.label} · {bagWeight(bag.id).toFixed(1)} lb
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
 
-            {mode === 'plan' ? (
-              <Pressable onPress={() => setAssignBagId(bag.id)}>
+          <View style={{ height: 16 }} />
+
+          {trip.bags.map((bag) => {
+            const items = trip.assignments.filter((a) => a.bagId === bag.id);
+            const toPack = items.filter((a) => a.status === 'reserved');
+            const packedItems = items.filter((a) => a.status === 'checked_out');
+            const bagW = bagWeight(bag.id);
+            const over = bagW > bag.maxWeightLb;
+            return (
+              <View key={bag.id} style={{ marginBottom: 18 }}>
+                <Pressable
+                  onPress={() => setBagEdit({ open: true, bagId: bag.id })}
+                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: bag.color, marginRight: 8 }} />
+                  <Text style={{ fontFamily: font.bold, fontSize: 16, color: t.text, flex: 1 }}>{bag.label}</Text>
+                  <Text
+                    style={{
+                      fontFamily: font.semibold,
+                      fontSize: 13,
+                      color: over ? t.alert : t.textMuted,
+                      marginRight: 6,
+                    }}>
+                    {bagW.toFixed(1)} / {bag.maxWeightLb} lb
+                  </Text>
+                  <Ionicons name="ellipsis-horizontal" size={18} color={t.textMuted} />
+                </Pressable>
+
                 <View
                   style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: t.border,
-                    borderStyle: 'dashed',
-                    paddingVertical: 12,
+                    height: 6,
+                    borderRadius: 999,
+                    backgroundColor: t.track,
+                    overflow: 'hidden',
+                    marginBottom: 12,
                   }}>
-                  <Ionicons name="add" size={18} color={t.primary} />
-                  <Text style={{ fontFamily: font.bold, color: t.primary, fontSize: 14 }}>Add gear to {bag.label}</Text>
+                  <View
+                    style={{
+                      height: 6,
+                      borderRadius: 999,
+                      width: `${Math.min(100, bag.maxWeightLb > 0 ? (bagW / bag.maxWeightLb) * 100 : 0)}%`,
+                      backgroundColor: over ? t.alert : bag.color,
+                    }}
+                  />
                 </View>
-              </Pressable>
-            ) : null}
-          </View>
-        );
-      })}
 
-      {mode === 'plan' ? (
-        <Pressable onPress={() => setBagEdit({ open: true, bagId: null })}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-              borderRadius: 14,
-              backgroundColor: t.soft,
-              paddingVertical: 14,
-            }}>
-            <Ionicons name="add" size={18} color={t.softText} />
-            <Text style={{ fontFamily: font.bold, color: t.softText, fontSize: 14 }}>Add another bag</Text>
-          </View>
-        </Pressable>
-      ) : null}
+                {items.length === 0 ? (
+                  <Text
+                    style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginBottom: 8, paddingLeft: 2 }}>
+                    Nothing planned for this bag yet.
+                  </Text>
+                ) : mode === 'plan' ? (
+                  renderCategoryGroups(items, renderPlanRow)
+                ) : mode === 'pack' ? (
+                  toPack.length > 0 ? (
+                    renderCategoryGroups(toPack, (a) => renderChecklistRow(a, 'pack'))
+                  ) : (
+                    <SuccessRow label="Everything in this bag is packed." />
+                  )
+                ) : packedItems.length > 0 ? (
+                  renderCategoryGroups(packedItems, (a) => renderChecklistRow(a, 'return'))
+                ) : (
+                  <SuccessRow label="Nothing from this bag needs to come back." />
+                )}
+
+                {mode === 'plan' ? (
+                  <Pressable onPress={() => setAssignBagId(bag.id)}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: t.border,
+                        borderStyle: 'dashed',
+                        paddingVertical: 12,
+                      }}>
+                      <Ionicons name="add" size={18} color={t.primary} />
+                      <Text style={{ fontFamily: font.bold, color: t.primary, fontSize: 14 }}>
+                        Add gear to {bag.label}
+                      </Text>
+                    </View>
+                  </Pressable>
+                ) : null}
+              </View>
+            );
+          })}
+
+          {mode === 'plan' ? (
+            <Pressable onPress={() => setBagEdit({ open: true, bagId: null })}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  borderRadius: 14,
+                  backgroundColor: t.soft,
+                  paddingVertical: 14,
+                }}>
+                <Ionicons name="add" size={18} color={t.softText} />
+                <Text style={{ fontFamily: font.bold, color: t.softText, fontSize: 14 }}>Add another bag</Text>
+              </View>
+            </Pressable>
+          ) : null}
+        </>
+      )}
 
       <Sheet visible={!!assignBagId} onClose={() => setAssignBagId(null)} title="Add gear">
-        {gear.map((item) => {
-          const inBag =
-            trip.assignments.find((a) => a.gearId === item.id && a.bagId === assignBagId)?.quantity ?? 0;
-          const remaining = remainingToAssign(item, trips, trip);
-          const expired = isExpiredDate(item.expiration, today);
-          const disabled = remaining <= 0;
-          return (
-            <Pressable
-              key={item.id}
-              disabled={disabled}
-              onPress={() => {
-                if (assignBagId && !disabled) {
-                  addAssignment(trip.id, assignBagId, item.id, 1);
-                  tapLight();
-                }
-              }}
-              style={{ marginBottom: 8, opacity: disabled ? 0.5 : 1 }}>
-              <Card style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.text }}>
-                    {item.brand} {item.name}
-                  </Text>
-                  <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-                    {item.category} · {item.weightLb.toFixed(2)} lb · {remaining} left to pack
-                  </Text>
-                </View>
-                {expired ? <Chip label="Expired" tone="alert" /> : null}
-                {inBag > 0 ? <Chip label={`In bag · ${inBag}`} tone="sage" /> : null}
-                <Ionicons
-                  name={disabled ? 'lock-closed-outline' : 'add-circle'}
-                  size={26}
-                  color={disabled ? t.textMuted : t.primary}
-                />
-              </Card>
-            </Pressable>
-          );
-        })}
+        {groupByCategory(gear, (item) => item.category).map(({ category, items: catItems }) => (
+          <View key={category} style={{ marginBottom: 10 }}>
+            <RowGroupLabel>{category}</RowGroupLabel>
+            {catItems.map((item) => {
+              const inBag =
+                trip.assignments.find((a) => a.gearId === item.id && a.bagId === assignBagId)?.quantity ?? 0;
+              const remaining = remainingToAssign(item, trips, trip);
+              const expired = isExpiredDate(item.expiration, today);
+              const disabled = remaining <= 0;
+              return (
+                <Pressable
+                  key={item.id}
+                  disabled={disabled}
+                  onPress={() => {
+                    if (assignBagId && !disabled) {
+                      addAssignment(trip.id, assignBagId, item.id, 1);
+                      tapLight();
+                    }
+                  }}
+                  style={{ marginBottom: 8, opacity: disabled ? 0.5 : 1 }}>
+                  <Card style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.text }}>
+                        {item.brand} {item.name}
+                      </Text>
+                      <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
+                        {item.weightLb.toFixed(2)} lb · {remaining} left to pack
+                      </Text>
+                    </View>
+                    {expired ? <Chip label="Expired" tone="alert" /> : null}
+                    {inBag > 0 ? <Chip label={`In bag · ${inBag}`} tone="sage" /> : null}
+                    <Ionicons
+                      name={disabled ? 'lock-closed-outline' : 'add-circle'}
+                      size={26}
+                      color={disabled ? t.textMuted : t.primary}
+                    />
+                  </Card>
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
       </Sheet>
 
       <Sheet visible={!!statusFor} onClose={() => setStatusFor(null)} title="Set status">
@@ -553,33 +602,52 @@ export default function TripDetail() {
   );
 }
 
-function ModeSwitch({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
+// Shown every time a trip is opened -- asks which of the three phases
+// you're in rather than defaulting silently, since guessing wrong means
+// the screen shows the wrong controls for what you're about to do.
+function ModeChooser({ suggested, onChoose }: { suggested: Mode; onChoose: (m: Mode) => void }) {
   const t = useTheme();
   return (
-    <View style={{ flexDirection: 'row', backgroundColor: t.track, borderRadius: 14, padding: 4 }}>
+    <View style={{ paddingTop: 4 }}>
+      <Text style={{ fontFamily: font.bold, fontSize: 16, color: t.text, marginBottom: 4 }}>
+        What do you want to do?
+      </Text>
+      <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginBottom: 16 }}>
+        You can switch later from the header.
+      </Text>
       {(Object.keys(MODE_META) as Mode[]).map((key) => {
-        const active = mode === key;
+        const isSuggested = key === suggested;
         return (
           <Pressable
             key={key}
             onPress={() => {
               tapLight();
-              onChange(key);
+              onChoose(key);
             }}
-            style={{
-              flex: 1,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-              paddingVertical: 10,
-              borderRadius: 10,
-              backgroundColor: active ? t.surface : 'transparent',
-            }}>
-            <Ionicons name={MODE_META[key].icon} size={15} color={active ? t.primary : t.textMuted} />
-            <Text style={{ fontFamily: font.bold, fontSize: 13, color: active ? t.text : t.textMuted }}>
-              {MODE_META[key].label}
-            </Text>
+            style={{ marginBottom: 10 }}>
+            <Card style={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <View
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
+                  backgroundColor: t.soft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Ionicons name={MODE_META[key].icon} size={20} color={t.softText} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text }}>{MODE_META[key].label}</Text>
+                  {isSuggested ? <Chip label="Suggested" tone="sage" /> : null}
+                </View>
+                <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginTop: 2 }}>
+                  {MODE_META[key].subtitle}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
+            </Card>
           </Pressable>
         );
       })}
