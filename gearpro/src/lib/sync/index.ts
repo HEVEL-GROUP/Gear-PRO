@@ -82,6 +82,7 @@ function toAssignmentRow(userId: string, tripId: string, a: Assignment) {
     gear_id: a.gearId,
     quantity: a.quantity,
     status: a.status,
+    status_reason: a.statusReason ?? null,
   };
 }
 
@@ -156,6 +157,7 @@ export async function pullFromCloud(): Promise<void> {
       bagId: r.bag_id,
       quantity: r.quantity,
       status: r.status,
+      statusReason: r.status_reason ?? undefined,
     };
     assignmentsByTrip.set(r.trip_id, [...(assignmentsByTrip.get(r.trip_id) ?? []), a]);
   }

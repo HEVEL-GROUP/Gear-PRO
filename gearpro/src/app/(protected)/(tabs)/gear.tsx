@@ -5,15 +5,24 @@ import { Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } fro
 
 import { GearFormModal } from '@/components/GearFormModal';
 import { ImportGearSheet } from '@/components/ImportGearSheet';
+import { NeedsAttentionSheet } from '@/components/NeedsAttentionSheet';
 import { Card, Chip, Display, Screen, Touchable } from '@/components/ui';
 import { font, radius, useTheme } from '@/theme/tokens';
-import { GearItem, groupByCategory, isExpiredDate, todayStamp, useGearStore } from '@/store/useGearStore';
+import {
+  flaggedAssignments,
+  GearItem,
+  groupByCategory,
+  isExpiredDate,
+  todayStamp,
+  useGearStore,
+} from '@/store/useGearStore';
 
 export default function GearScreen() {
   const t = useTheme();
   const { width } = useWindowDimensions();
   const isWide = width >= 880;
   const gear = useGearStore((s) => s.gear);
+  const trips = useGearStore((s) => s.trips);
   const allCategories = useGearStore((s) => s.categories);
   const today = todayStamp();
   const [q, setQ] = useState('');
@@ -23,6 +32,9 @@ export default function GearScreen() {
     editId: null,
   });
   const [importOpen, setImportOpen] = useState(false);
+  const [attentionOpen, setAttentionOpen] = useState(false);
+
+  const flaggedCount = useMemo(() => flaggedAssignments(trips).length, [trips]);
 
   const usedCategories = useMemo(
     () => allCategories.filter((c) => gear.some((g) => g.category === c)),
@@ -98,6 +110,26 @@ export default function GearScreen() {
           <Ionicons name="cloud-upload-outline" size={22} color={t.primary} />
         </Pressable>
       </View>
+
+      {flaggedCount > 0 ? (
+        <Pressable onPress={() => setAttentionOpen(true)} style={{ marginBottom: 14 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+              backgroundColor: t.alertSoft,
+              borderRadius: 14,
+              padding: 14,
+            }}>
+            <Ionicons name="alert-circle-outline" size={20} color={t.alertText} />
+            <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.alertText, flex: 1 }}>
+              {flaggedCount} item{flaggedCount === 1 ? '' : 's'} need{flaggedCount === 1 ? 's' : ''} attention
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={t.alertText} />
+          </View>
+        </Pressable>
+      ) : null}
 
       <View
         style={{
@@ -205,6 +237,7 @@ export default function GearScreen() {
         onClose={() => setModal({ open: false, editId: null })}
       />
       <ImportGearSheet visible={importOpen} onClose={() => setImportOpen(false)} />
+      <NeedsAttentionSheet visible={attentionOpen} onClose={() => setAttentionOpen(false)} />
     </Screen>
   );
 }

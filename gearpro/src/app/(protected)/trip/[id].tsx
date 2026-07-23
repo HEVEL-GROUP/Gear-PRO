@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 
 import { BagFormSheet } from '@/components/BagFormSheet';
-import { Sheet } from '@/components/form';
+import { Button, Field, Sheet } from '@/components/form';
 import { Card, Chip, Display, Screen } from '@/components/ui';
 import { WeatherCard } from '@/components/WeatherCard';
 import { WeightRing } from '@/components/WeightRing';
@@ -13,7 +13,6 @@ import { font, useTheme } from '@/theme/tokens';
 import {
   Assignment,
   bagTarget,
-  checkedOutElsewhere,
   GearStatus,
   gearMap,
   groupByCategory,
@@ -21,12 +20,15 @@ import {
   itemCount,
   packedCount,
   remainingToAssign,
+  RETURN_OUTCOME_STATUSES,
   STATUS_LABELS,
   STATUS_ORDER,
+  STATUSES_WITH_REASON,
   todayStamp,
   TripLifecycle,
   tripLifecycle,
   tripWeight,
+  unavailableElsewhere,
   useGearStore,
 } from '@/store/useGearStore';
 
@@ -36,7 +38,7 @@ const statusTone = (s: GearStatus): ChipTone =>
     ? 'solid'
     : s === 'reserved'
       ? 'sage'
-      : s === 'returned'
+      : s === 'returned' || s === 'consumed'
         ? 'neutral'
         : 'alert';
 
@@ -84,6 +86,13 @@ export default function TripDetail() {
 
   const [assignBagId, setAssignBagId] = useState<string | null>(null);
   const [statusFor, setStatusFor] = useState<string | null>(null);
+  // Plan's status chip offers every status; Return's tap-to-check-in offers
+  // only the outcomes that make sense when gear comes back.
+  const [statusKind, setStatusKind] = useState<'plan' | 'return'>('plan');
+  // Set while needs_repair/lost is picked but not yet confirmed -- swaps the
+  // sheet to a one-field reason step instead of applying immediately.
+  const [pendingReasonStatus, setPendingReasonStatus] = useState<GearStatus | null>(null);
+  const [reasonText, setReasonText] = useState('');
   const [moveFor, setMoveFor] = useState<string | null>(null);
   const [bagEdit, setBagEdit] = useState<{ open: boolean; bagId: string | null }>({
     open: false,
@@ -113,6 +122,16 @@ export default function TripDetail() {
   const lifecycle = tripLifecycle(trip, today);
   const packed = packedCount(trip);
   const statusForAssignment = trip.assignments.find((a) => a.id === statusFor);
+  const closeStatusSheet = () => {
+    setStatusFor(null);
+    setPendingReasonStatus(null);
+    setReasonText('');
+  };
+  const applyStatus = (status: GearStatus, reason?: string) => {
+    if (statusFor) updateAssignment(trip.id, statusFor, { status, statusReason: reason || undefined });
+    tapSuccess();
+    closeStatusSheet();
+  };
   const bagWeight = (bagId: string) =>
     trip.assignments
       .filter((a) => a.bagId === bagId)
@@ -122,7 +141,7 @@ export default function TripDetail() {
   const maxQuantityFor = (assignment: (typeof trip.assignments)[number]) => {
     const item = byId[assignment.gearId];
     if (!item) return assignment.quantity;
-    const elsewhere = checkedOutElsewhere(trips, assignment.gearId, trip.id);
+    const elsewhere = unavailableElsewhere(trips, assignment.gearId, trip.id);
     const otherInThisTrip = trip.assignments
       .filter((x) => x.gearId === assignment.gearId && x.id !== assignment.id)
       .reduce((sum, x) => sum + x.quantity, 0);
@@ -144,7 +163,11 @@ export default function TripDetail() {
             {((item?.weightLb ?? 0) * a.quantity).toFixed(2)} lb
           </Text>
           <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-            <Pressable onPress={() => setStatusFor(a.id)}>
+            <Pressable
+              onPress={() => {
+                setStatusKind('plan');
+                setStatusFor(a.id);
+              }}>
               <Chip label={STATUS_LABELS[a.status]} tone={statusTone(a.status)} />
             </Pressable>
             {expired ? <Chip label="Expired" tone="alert" /> : null}
@@ -188,19 +211,24 @@ export default function TripDetail() {
     );
   };
 
-  // Pack/Return modes: a shrinking checklist -- tap an item to advance it
-  // (reserved -> checked_out for 'pack', checked_out -> returned for 'return')
-  // and it drops off the list. Return rows get a small overflow to reroute an
-  // item to needs_repair/consumed/lost instead of a clean return.
+  // Pack mode: a shrinking checklist -- tap an item to mark it packed
+  // (reserved -> checked_out) and it drops off the list. Return mode taps
+  // open the status picker instead of a single clean return, since coming
+  // back isn't always a clean return -- it might need repair, be used up, or
+  // be lost.
   const renderChecklistRow = (a: (typeof trip.assignments)[number], kind: 'pack' | 'return') => {
     const item = byId[a.gearId];
-    const nextStatus: GearStatus = kind === 'pack' ? 'checked_out' : 'returned';
     return (
       <Pressable
         key={a.id}
         onPress={() => {
-          updateAssignment(trip.id, a.id, { status: nextStatus });
-          tapSuccess();
+          if (kind === 'pack') {
+            updateAssignment(trip.id, a.id, { status: 'checked_out' });
+            tapSuccess();
+          } else {
+            setStatusKind('return');
+            setStatusFor(a.id);
+          }
         }}>
         <Card style={{ padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Ionicons name="ellipse-outline" size={24} color={t.textMuted} />
@@ -213,16 +241,7 @@ export default function TripDetail() {
               {a.quantity > 1 ? ` · ×${a.quantity}` : ''}
             </Text>
           </View>
-          {kind === 'return' ? (
-            <Pressable
-              hitSlop={8}
-              onPress={(e) => {
-                e.stopPropagation();
-                setStatusFor(a.id);
-              }}>
-              <Ionicons name="ellipsis-horizontal" size={20} color={t.textMuted} />
-            </Pressable>
-          ) : null}
+          {kind === 'return' ? <Ionicons name="chevron-forward" size={18} color={t.textMuted} /> : null}
         </Card>
       </Pressable>
     );
@@ -540,26 +559,62 @@ export default function TripDetail() {
         ))}
       </Sheet>
 
-      <Sheet visible={!!statusFor} onClose={() => setStatusFor(null)} title="Set status">
-        {STATUS_ORDER.map((s) => {
-          const active = statusForAssignment?.status === s;
-          return (
-            <Pressable
-              key={s}
-              onPress={() => {
-                if (statusFor) updateAssignment(trip.id, statusFor, { status: s });
-                tapSuccess();
-                setStatusFor(null);
-              }}
-              style={{ marginBottom: 8 }}>
-              <Card style={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Chip label={STATUS_LABELS[s]} tone={statusTone(s)} />
-                <View style={{ flex: 1 }} />
-                {active ? <Ionicons name="checkmark-circle" size={22} color={t.primary} /> : null}
-              </Card>
-            </Pressable>
-          );
-        })}
+      <Sheet
+        visible={!!statusFor}
+        onClose={closeStatusSheet}
+        title={
+          pendingReasonStatus
+            ? `Why ${STATUS_LABELS[pendingReasonStatus].toLowerCase()}?`
+            : statusKind === 'return'
+              ? 'Check in'
+              : 'Set status'
+        }>
+        {pendingReasonStatus ? (
+          <>
+            <Field
+              label="Reason (optional)"
+              value={reasonText}
+              onChangeText={setReasonText}
+              placeholder={
+                pendingReasonStatus === 'lost'
+                  ? 'Left it at camp, fell off the pack…'
+                  : 'Zipper broke, pole cracked…'
+              }
+              multiline
+            />
+            <Button
+              label={`Mark ${STATUS_LABELS[pendingReasonStatus].toLowerCase()}`}
+              tone="danger"
+              onPress={() => applyStatus(pendingReasonStatus, reasonText.trim())}
+            />
+            <View style={{ height: 8 }} />
+            <Button label="Back" tone="ghost" onPress={() => setPendingReasonStatus(null)} />
+          </>
+        ) : (
+          (statusKind === 'return' ? RETURN_OUTCOME_STATUSES : STATUS_ORDER)
+            .filter((s) => s !== 'consumed' || byId[statusForAssignment?.gearId ?? '']?.category === 'Food')
+            .map((s) => {
+              const active = statusForAssignment?.status === s;
+              return (
+                <Pressable
+                  key={s}
+                  onPress={() => {
+                    if (STATUSES_WITH_REASON.includes(s)) {
+                      setPendingReasonStatus(s);
+                      return;
+                    }
+                    applyStatus(s);
+                  }}
+                  style={{ marginBottom: 8 }}>
+                  <Card style={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Chip label={STATUS_LABELS[s]} tone={statusTone(s)} />
+                    <View style={{ flex: 1 }} />
+                    {active ? <Ionicons name="checkmark-circle" size={22} color={t.primary} /> : null}
+                  </Card>
+                </Pressable>
+              );
+            })
+        )}
       </Sheet>
 
       <Sheet visible={!!moveFor} onClose={() => setMoveFor(null)} title="Move to bag">

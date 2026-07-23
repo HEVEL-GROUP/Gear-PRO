@@ -30,6 +30,7 @@ export type Assignment = {
   bagId: string;
   quantity: number;
   status: GearStatus;
+  statusReason?: string;
   essential?: boolean;
 };
 
@@ -62,6 +63,18 @@ export const STATUS_ORDER: GearStatus[] = [
   'consumed',
   'lost',
 ];
+
+// The outcomes offered when checking gear back in from a trip -- a narrower
+// list than STATUS_ORDER, which also includes the pre-trip statuses.
+export const RETURN_OUTCOME_STATUSES: GearStatus[] = ['returned', 'needs_repair', 'consumed', 'lost'];
+
+// Reason text is prompted for these -- there's a decision to remember
+// (why it broke, where it was lost) that's worth capturing while it's fresh.
+export const STATUSES_WITH_REASON: GearStatus[] = ['needs_repair', 'lost'];
+
+// Statuses that pull a unit out of the available pool until resolved --
+// packed elsewhere, or flagged as broken/lost/used up.
+const UNAVAILABLE_STATUSES: GearStatus[] = ['checked_out', 'needs_repair', 'consumed', 'lost'];
 
 export const BAG_COLORS = ['#7a8a5e', '#4a5334', '#c67139', '#5b7fa6', '#8a6d9e', '#6f6a60'];
 
@@ -236,7 +249,19 @@ export const useGearStore = create<StoreState>()(
       addGear: (item) => set((s) => ({ gear: [...s.gear, { ...item, id: uid() }] })),
       updateGear: (id, patch) =>
         set((s) => ({ gear: s.gear.map((it) => (it.id === id ? { ...it, ...patch } : it)) })),
-      removeGear: (id) => set((s) => ({ gear: s.gear.filter((it) => it.id !== id) })),
+      // Cascades to every trip's assignments so deleting gear never leaves an
+      // orphaned "Unknown" row behind -- the normal edit-form delete already
+      // refuses to run while an item is in use, but this is also the direct
+      // target of "remove forever" from the Needs Attention list, which is
+      // meant to bypass that guard.
+      removeGear: (id) =>
+        set((s) => ({
+          gear: s.gear.filter((it) => it.id !== id),
+          trips: s.trips.map((t) => ({
+            ...t,
+            assignments: t.assignments.filter((a) => a.gearId !== id),
+          })),
+        })),
       addTrip: (trip) => {
         const id = uid();
         set((s) => ({ trips: [...s.trips, { ...trip, id }] }));
@@ -395,12 +420,13 @@ export function itemCount(trip: Trip): number {
   return trip.assignments.reduce((sum, a) => sum + a.quantity, 0);
 }
 
-// How many units of this gear are packed (checked_out) on OTHER trips right now.
-export function checkedOutElsewhere(trips: Trip[], gearId: string, excludeTripId: string): number {
+// How many units of this gear are unavailable (packed, or flagged
+// broken/consumed/lost) on OTHER trips right now.
+export function unavailableElsewhere(trips: Trip[], gearId: string, excludeTripId: string): number {
   return trips
     .filter((t) => t.id !== excludeTripId)
     .flatMap((t) => t.assignments)
-    .filter((a) => a.gearId === gearId && a.status === 'checked_out')
+    .filter((a) => a.gearId === gearId && UNAVAILABLE_STATUSES.includes(a.status))
     .reduce((sum, a) => sum + a.quantity, 0);
 }
 
@@ -412,7 +438,7 @@ export function assignedInTrip(trip: Trip, gearId: string): number {
 
 // Units still available to add to this trip: owned minus packed elsewhere minus already assigned here.
 export function remainingToAssign(item: GearItem, trips: Trip[], trip: Trip): number {
-  const elsewhere = checkedOutElsewhere(trips, item.id, trip.id);
+  const elsewhere = unavailableElsewhere(trips, item.id, trip.id);
   const here = assignedInTrip(trip, item.id);
   return Math.max(item.quantity - elsewhere - here, 0);
 }
@@ -429,6 +455,17 @@ export function allPackedAssignments(
   return trips.flatMap((trip) =>
     trip.assignments
       .filter((a) => a.status === 'checked_out')
+      .map((assignment) => ({ trip, assignment })),
+  );
+}
+
+// Every assignment checked in as broken, lost, or consumed -- the "needs
+// attention" list: gear that's out of the available pool until someone
+// either fixes/restocks and adds it back, or removes it for good.
+export function flaggedAssignments(trips: Trip[]): { trip: Trip; assignment: Assignment }[] {
+  return trips.flatMap((trip) =>
+    trip.assignments
+      .filter((a) => a.status === 'needs_repair' || a.status === 'consumed' || a.status === 'lost')
       .map((assignment) => ({ trip, assignment })),
   );
 }
