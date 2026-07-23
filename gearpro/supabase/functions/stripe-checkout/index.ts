@@ -15,15 +15,12 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('Missing authorization header');
-
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) throw new Error('Not authenticated');
-    const user = userData.user;
+    const token = authHeader.replace('Bearer ', '');
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const { data: userData, error: userError } = await admin.auth.getUser(token);
+    if (userError || !userData.user) throw new Error('Not authenticated');
+    const user = userData.user;
 
     const { data: profile } = await admin
       .from('user_profiles')
@@ -41,11 +38,15 @@ Deno.serve(async (req) => {
       await admin.from('user_profiles').update({ stripe_customer_id: customerId }).eq('user_id', user.id);
     }
 
+    const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
+    const plan = body?.plan === 'annual' ? 'annual' : 'monthly';
+    const priceId = Deno.env.get(plan === 'annual' ? 'STRIPE_PRICE_ANNUAL' : 'STRIPE_PRICE_MONTHLY')!;
+
     const base = appOrigin(origin);
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
-      line_items: [{ price: Deno.env.get('STRIPE_PRICE_MONTHLY')!, quantity: 1 }],
+      line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${base}/you?checkout=success`,
       cancel_url: `${base}/you?checkout=cancelled`,
     });

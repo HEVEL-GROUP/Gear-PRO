@@ -1,19 +1,25 @@
 import { Redirect } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { Button } from '@/components/form';
 import { Mark } from '@/components/Mark';
-import { Card, Display, Screen } from '@/components/ui';
+import { Card, Chip, Display, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthProvider';
-import { startCheckout } from '@/lib/stripe/checkout';
+import { Plan, startCheckout } from '@/lib/stripe/checkout';
 import { usePro } from '@/lib/stripe/usePro';
 import { font, useTheme } from '@/theme/tokens';
+
+const PLAN_COPY: Record<Plan, { label: string; price: string; sub: string }> = {
+  monthly: { label: 'Monthly', price: '$10/mo', sub: 'Billed every month' },
+  annual: { label: 'Annual', price: '$50/yr', sub: 'Billed once a year · save 58%' },
+};
 
 export default function SubscribeScreen() {
   const t = useTheme();
   const { session, isLoading, signOut } = useAuth();
   const { isPro, refresh } = usePro();
+  const [plan, setPlan] = useState<Plan>('annual');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +40,7 @@ export default function SubscribeScreen() {
     setBusy(true);
     setError(null);
     try {
-      await startCheckout();
+      await startCheckout(plan);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -57,11 +63,50 @@ export default function SubscribeScreen() {
             textAlign: 'center',
             paddingHorizontal: 8,
           }}>
-          Your free trial has ended (or this email already used one). $4.99/mo keeps your gear,
-          trips, and cloud sync going.
+          Your free trial has ended (or this email already used one). Pick a plan to keep your
+          gear, trips, and cloud sync going.
         </Text>
+
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {(Object.keys(PLAN_COPY) as Plan[]).map((key) => {
+            const active = plan === key;
+            return (
+              <Pressable key={key} onPress={() => setPlan(key)} style={{ flex: 1 }}>
+                <Card
+                  style={{
+                    alignItems: 'center',
+                    paddingVertical: 16,
+                    borderWidth: 2,
+                    borderColor: active ? t.primary : t.border,
+                  }}>
+                  {key === 'annual' ? <Chip label="Best value" tone="sage" /> : null}
+                  <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.text, marginTop: 8 }}>
+                    {PLAN_COPY[key].label}
+                  </Text>
+                  <Text style={{ fontFamily: font.extrabold, fontSize: 22, color: t.text, marginTop: 4 }}>
+                    {PLAN_COPY[key].price}
+                  </Text>
+                  <Text
+                    style={{
+                      fontFamily: font.medium,
+                      fontSize: 11,
+                      color: t.textMuted,
+                      marginTop: 2,
+                      textAlign: 'center',
+                    }}>
+                    {PLAN_COPY[key].sub}
+                  </Text>
+                </Card>
+              </Pressable>
+            );
+          })}
+        </View>
+
         <Card style={{ gap: 10 }}>
-          <Button label={busy ? 'Opening…' : 'Subscribe — $4.99/mo'} onPress={handleUpgrade} />
+          <Button
+            label={busy ? 'Opening…' : `Subscribe — ${PLAN_COPY[plan].price}`}
+            onPress={handleUpgrade}
+          />
           {error && <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.alert }}>{error}</Text>}
           <Button label="I already subscribed — refresh" tone="ghost" onPress={refresh} />
         </Card>

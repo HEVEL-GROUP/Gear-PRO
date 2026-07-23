@@ -240,7 +240,7 @@ export function LandingPage() {
               </Touchable>
             </View>
             <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 10 }}>
-              $4.99/mo after your trial · cancel anytime
+              $10/mo or $50/yr after your trial · cancel anytime
             </Text>
           </View>
 
@@ -376,58 +376,88 @@ export function LandingPage() {
         <View style={{ marginBottom: 56, alignItems: 'center' }}>
           <SectionHeader
             eyebrow="PRICING"
-            title="One plan. Everything included."
+            title="Everything included, either way."
             subtitle="No free tier, no feature paywalls buried inside the app — just a 7-day trial to make sure it's for you."
           />
-          <Card
+          <View
             style={{
+              flexDirection: isWide ? 'row' : 'column',
+              gap: 16,
               width: '100%',
-              maxWidth: 380,
-              borderColor: t.primary,
-              borderWidth: 2,
-              alignItems: 'center',
-              paddingVertical: 28,
+              maxWidth: isWide ? 720 : 380,
+              alignItems: isWide ? 'flex-end' : 'stretch',
             }}>
-            <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text }}>GearPro Pro</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginTop: 8 }}>
-              <Text style={{ fontFamily: font.extrabold, fontSize: 40, color: t.text }}>$4.99</Text>
-              <Text style={{ fontFamily: font.medium, fontSize: 14, color: t.textMuted, marginBottom: 8 }}>
-                /month
-              </Text>
-            </View>
-            <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 4 }}>
-              7-day free trial · cancel anytime
-            </Text>
-
-            <View style={{ width: '100%', gap: 10, marginTop: 22, marginBottom: 22 }}>
-              {[
-                'Unlimited trips & gear',
-                'Cloud sync across every device',
-                'Works fully offline',
-                'Weight tracking & check-in / check-out',
-                'Cancel anytime from the app',
-              ].map((line) => (
-                <View key={line} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Ionicons name="checkmark-circle" size={16} color={t.primary} />
-                  <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.text }}>{line}</Text>
-                </View>
-              ))}
-            </View>
-
-            <Touchable onPress={() => router.push('/signup')} style={{ width: '100%' }}>
-              <View
+            {(
+              [
+                { key: 'monthly', price: '$10', per: '/month', badge: null, sub: 'Billed every month' },
+                {
+                  key: 'annual',
+                  price: '$50',
+                  per: '/year',
+                  badge: 'Best value · save 58%',
+                  sub: 'Billed once a year',
+                },
+              ] as const
+            ).map((plan) => (
+              <Card
+                key={plan.key}
                 style={{
-                  backgroundColor: t.primary,
-                  borderRadius: 14,
-                  paddingVertical: 15,
+                  flex: 1,
+                  borderColor: plan.key === 'annual' ? t.primary : t.border,
+                  borderWidth: plan.key === 'annual' ? 2 : 1,
                   alignItems: 'center',
+                  paddingVertical: 28,
                 }}>
-                <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.onPrimary }}>
-                  Start your free trial
+                {plan.badge ? <Chip label={plan.badge} tone="sage" /> : null}
+                <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text, marginTop: plan.badge ? 10 : 0 }}>
+                  GearPro Pro
                 </Text>
-              </View>
-            </Touchable>
-          </Card>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginTop: 8 }}>
+                  <Text style={{ fontFamily: font.extrabold, fontSize: 40, color: t.text }}>{plan.price}</Text>
+                  <Text style={{ fontFamily: font.medium, fontSize: 14, color: t.textMuted, marginBottom: 8 }}>
+                    {plan.per}
+                  </Text>
+                </View>
+                <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 4 }}>
+                  {plan.sub} · 7-day free trial
+                </Text>
+
+                <View style={{ width: '100%', gap: 10, marginTop: 22, marginBottom: 22 }}>
+                  {[
+                    'Unlimited trips & gear',
+                    'Cloud sync across every device',
+                    'Works fully offline',
+                    'Weight tracking & check-in / check-out',
+                    'Cancel anytime from the app',
+                  ].map((line) => (
+                    <View key={line} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Ionicons name="checkmark-circle" size={16} color={t.primary} />
+                      <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.text }}>{line}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                <Touchable onPress={() => router.push('/signup')} style={{ width: '100%' }}>
+                  <View
+                    style={{
+                      backgroundColor: plan.key === 'annual' ? t.primary : t.soft,
+                      borderRadius: 14,
+                      paddingVertical: 15,
+                      alignItems: 'center',
+                    }}>
+                    <Text
+                      style={{
+                        fontFamily: font.bold,
+                        fontSize: 15,
+                        color: plan.key === 'annual' ? t.onPrimary : t.softText,
+                      }}>
+                      Start your free trial
+                    </Text>
+                  </View>
+                </Touchable>
+              </Card>
+            ))}
+          </View>
         </View>
 
         {/* Closing CTA */}
@@ -462,7 +492,7 @@ export function LandingPage() {
             </View>
           </Touchable>
           <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.softText, marginTop: 12 }}>
-            $4.99/mo after trial · cancel anytime
+            $10/mo or $50/yr after trial · cancel anytime
           </Text>
         </View>
 

@@ -15,14 +15,12 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('Missing authorization header');
-
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) throw new Error('Not authenticated');
+    const token = authHeader.replace('Bearer ', '');
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const { data: userData, error: userError } = await admin.auth.getUser(token);
+    if (userError || !userData.user) throw new Error('Not authenticated');
+
     const { data: profile } = await admin
       .from('user_profiles')
       .select('stripe_customer_id')

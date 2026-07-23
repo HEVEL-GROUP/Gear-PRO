@@ -8,7 +8,7 @@ import { Mark } from '@/components/Mark';
 import { Card, Display, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { tapLight } from '@/lib/haptics';
-import { openBillingPortal, startCheckout } from '@/lib/stripe/checkout';
+import { openBillingPortal } from '@/lib/stripe/checkout';
 import { usePro } from '@/lib/stripe/usePro';
 import { font, useTheme } from '@/theme/tokens';
 
@@ -105,9 +105,9 @@ export default function YouScreen() {
             </Text>
           </View>
           <Button
-            label={billingBusy ? 'Opening…' : isTrial ? 'Subscribe — $4.99/mo' : 'Manage subscription'}
+            label={billingBusy ? 'Opening…' : isTrial ? 'Choose a plan' : 'Manage subscription'}
             tone={isTrial ? 'primary' : 'ghost'}
-            onPress={() => handleBilling(isTrial ? startCheckout : openBillingPortal)}
+            onPress={() => (isTrial ? router.push('/subscribe') : handleBilling(openBillingPortal))}
           />
           {billingError && (
             <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.alert }}>{billingError}</Text>
