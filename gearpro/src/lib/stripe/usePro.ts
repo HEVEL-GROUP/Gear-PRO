@@ -6,6 +6,10 @@ import { supabase } from '@/lib/supabase/client';
 type ProStatus = {
   isPro: boolean | null;
   planType: string | null;
+  /** 'stripe' | 'manual' | 'demo' | 'trial' | null -- distinguishes a real
+   * Stripe subscription (has billing to manage) from a manually-granted or
+   * trial one (nothing for the Stripe billing portal to open). */
+  source: string | null;
   trialEndsAt: string | null;
   refresh: () => Promise<void>;
 };
@@ -17,12 +21,14 @@ export function usePro(): ProStatus {
   const { session } = useAuth();
   const [isPro, setIsPro] = useState<boolean | null>(null);
   const [planType, setPlanType] = useState<string | null>(null);
+  const [source, setSource] = useState<string | null>(null);
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!session) {
       setIsPro(null);
       setPlanType(null);
+      setSource(null);
       setTrialEndsAt(null);
       return;
     }
@@ -30,7 +36,7 @@ export function usePro(): ProStatus {
       supabase.rpc('is_pro_user'),
       supabase
         .from('user_access_grants')
-        .select('plan_type, ends_at')
+        .select('plan_type, source, ends_at')
         .eq('status', 'active')
         .order('starts_at', { ascending: false })
         .limit(1)
@@ -39,6 +45,7 @@ export function usePro(): ProStatus {
     if (!proRes.error) setIsPro(Boolean(proRes.data));
     if (!grantRes.error) {
       setPlanType(grantRes.data?.plan_type ?? null);
+      setSource(grantRes.data?.source ?? null);
       setTrialEndsAt(grantRes.data?.plan_type === 'trial' ? (grantRes.data?.ends_at ?? null) : null);
     }
   }, [session]);
@@ -58,5 +65,5 @@ export function usePro(): ProStatus {
     };
   }, [refresh]);
 
-  return { isPro, planType, trialEndsAt, refresh };
+  return { isPro, planType, source, trialEndsAt, refresh };
 }

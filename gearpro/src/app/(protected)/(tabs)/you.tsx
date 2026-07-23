@@ -51,7 +51,7 @@ export default function YouScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 880;
   const { session, signOut } = useAuth();
-  const { planType, trialEndsAt } = usePro();
+  const { planType, source, trialEndsAt } = usePro();
   const gear = useGearStore((s) => s.gear);
   const trips = useGearStore((s) => s.trips);
   const resetLocal = useGearStore((s) => s.resetLocal);
@@ -62,6 +62,9 @@ export default function YouScreen() {
   const [deleteSheetOpen, setDeleteSheetOpen] = useState(false);
 
   const isTrial = planType === 'trial';
+  // Only a real Stripe subscription has a billing-portal session to open --
+  // a manually-granted or demo access row has no Stripe customer behind it.
+  const hasStripeBilling = source === 'stripe';
   const demoCounts = useMemo(() => demoDataCounts(gear, trips), [gear, trips]);
   const hasDemoData = demoCounts.gear > 0 || demoCounts.trips > 0;
 
@@ -127,14 +130,18 @@ export default function YouScreen() {
             <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
               {isTrial && trialEndsAt
                 ? `${daysLeft(trialEndsAt)} day${daysLeft(trialEndsAt) === 1 ? '' : 's'} left — subscribe anytime`
-                : "You're supporting GearPro's development"}
+                : hasStripeBilling
+                  ? "You're supporting GearPro's development"
+                  : 'Complimentary access — no billing on this account'}
             </Text>
           </View>
-          <Button
-            label={billingBusy ? 'Opening…' : isTrial ? 'Choose a plan' : 'Manage subscription'}
-            tone={isTrial ? 'primary' : 'ghost'}
-            onPress={() => (isTrial ? router.push('/subscribe') : handleBilling(openBillingPortal))}
-          />
+          {(isTrial || hasStripeBilling) && (
+            <Button
+              label={billingBusy ? 'Opening…' : isTrial ? 'Choose a plan' : 'Manage subscription'}
+              tone={isTrial ? 'primary' : 'ghost'}
+              onPress={() => (isTrial ? router.push('/subscribe') : handleBilling(openBillingPortal))}
+            />
+          )}
           {billingError && (
             <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.alert }}>{billingError}</Text>
           )}

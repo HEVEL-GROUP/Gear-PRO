@@ -29,10 +29,19 @@ Deno.serve(async (req) => {
 
     if (!profile?.stripe_customer_id) throw new Error('No billing account yet -- subscribe first');
 
-    const session = await stripe.billingPortal.sessions.create({
-      customer: profile.stripe_customer_id,
-      return_url: `${appOrigin(origin)}/you`,
-    });
+    let session;
+    try {
+      session = await stripe.billingPortal.sessions.create({
+        customer: profile.stripe_customer_id,
+        return_url: `${appOrigin(origin)}/you`,
+      });
+    } catch {
+      // Stored id doesn't resolve in the current Stripe mode (e.g. it was
+      // created before a test->live cutover) -- self-heal so the next
+      // checkout creates a fresh customer instead of hitting this every time.
+      await admin.from('user_profiles').update({ stripe_customer_id: null }).eq('user_id', userData.user.id);
+      throw new Error('No billing account yet -- subscribe first');
+    }
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...headers, 'Content-Type': 'application/json' },

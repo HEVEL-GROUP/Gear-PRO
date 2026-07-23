@@ -29,6 +29,16 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     let customerId = profile?.stripe_customer_id as string | undefined;
+    if (customerId) {
+      // A stored id can go stale (e.g. it was created in a different Stripe
+      // mode, or deleted directly in the dashboard) -- verify it before
+      // reusing it rather than letting session creation hard-fail below.
+      try {
+        await stripe.customers.retrieve(customerId);
+      } catch {
+        customerId = undefined;
+      }
+    }
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: user.email,
