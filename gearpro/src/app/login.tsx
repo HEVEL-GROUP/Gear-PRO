@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Button, Field } from '@/components/form';
+import { AuthDivider, GoogleSignInButton } from '@/components/GoogleSignInButton';
 import { Mark } from '@/components/Mark';
 import { Display, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthProvider';
@@ -54,6 +55,9 @@ export default function LoginScreen() {
         <Display style={{ fontSize: 22, marginTop: 12 }}>Welcome back</Display>
       </View>
 
+      <GoogleSignInButton onError={setError} />
+      <AuthDivider />
+
       <Field
         label="Email"
         value={email}
@@ -85,6 +89,9 @@ export default function LoginScreen() {
           <Text style={{ fontFamily: font.bold, fontSize: 13, color: t.primary }}>Create an account</Text>
         </Pressable>
       </View>
+      <Pressable onPress={() => router.push('/privacy')} style={{ marginTop: 14, alignSelf: 'center' }}>
+        <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>Privacy Policy</Text>
+      </Pressable>
     </Screen>
   );
 }
