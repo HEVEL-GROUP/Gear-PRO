@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 
 import { BagFormSheet } from '@/components/BagFormSheet';
+import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { Button, Field, Sheet } from '@/components/form';
 import { Card, Chip, Display, Screen } from '@/components/ui';
 import { WeatherCard } from '@/components/WeatherCard';
@@ -94,6 +95,7 @@ export default function TripDetail() {
   const [pendingReasonStatus, setPendingReasonStatus] = useState<GearStatus | null>(null);
   const [reasonText, setReasonText] = useState('');
   const [moveFor, setMoveFor] = useState<string | null>(null);
+  const [confirmDeleteTrip, setConfirmDeleteTrip] = useState(false);
   const [bagEdit, setBagEdit] = useState<{ open: boolean; bagId: string | null }>({
     open: false,
     bagId: null,
@@ -276,10 +278,7 @@ export default function TripDetail() {
         </View>
         <Chip label={LIFECYCLE_META[lifecycle].label} tone={LIFECYCLE_META[lifecycle].tone} />
         <Pressable
-          onPress={() => {
-            removeTrip(trip.id);
-            router.back();
-          }}
+          onPress={() => setConfirmDeleteTrip(true)}
           hitSlop={12}
           style={{ marginLeft: 10 }}>
           <Ionicons name="trash-outline" size={20} color={t.textMuted} />
@@ -662,6 +661,17 @@ export default function TripDetail() {
         tripId={trip.id}
         editBagId={bagEdit.bagId}
         onClose={() => setBagEdit({ open: false, bagId: null })}
+      />
+      <ConfirmSheet
+        visible={confirmDeleteTrip}
+        title="Delete trip?"
+        message={`Delete "${trip.name}" and its packing list? Your gear stays in your library — only this trip is removed. This can't be undone.`}
+        confirmLabel="Delete trip"
+        onConfirm={() => {
+          removeTrip(trip.id);
+          router.back();
+        }}
+        onClose={() => setConfirmDeleteTrip(false)}
       />
     </Screen>
   );

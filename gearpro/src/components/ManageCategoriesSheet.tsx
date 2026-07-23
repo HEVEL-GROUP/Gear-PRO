@@ -22,6 +22,7 @@ export function ManageCategoriesSheet({ visible, onClose }: Props) {
   const [draft, setDraft] = useState('');
   const [adding, setAdding] = useState(false);
   const [newDraft, setNewDraft] = useState('');
+  const [confirmingRemove, setConfirmingRemove] = useState<string | null>(null);
 
   const countFor = (name: string) => gear.filter((g) => g.category === name).length;
 
@@ -133,31 +134,45 @@ export function ManageCategoriesSheet({ visible, onClose }: Props) {
             );
           }
 
+          const confirming = confirmingRemove === c;
           return (
             <Card key={c} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginBottom: 8 }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.text }}>{c}</Text>
-                <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 1 }}>
-                  {count} item{count === 1 ? '' : 's'}
+                <Text style={{ fontFamily: font.medium, fontSize: 12, color: confirming ? t.alert : t.textMuted, marginTop: 1 }}>
+                  {confirming ? 'Delete this category?' : `${count} item${count === 1 ? '' : 's'}`}
                 </Text>
               </View>
-              <Pressable
-                onPress={() => {
-                  setEditing(c);
-                  setDraft(c);
-                }}
-                hitSlop={8}>
-                <Ionicons name="pencil-outline" size={18} color={t.text} />
-              </Pressable>
-              <Pressable
-                hitSlop={8}
-                onPress={() => {
-                  if (inUse) return;
-                  tapLight();
-                  removeCategory(c);
-                }}>
-                <Ionicons name="trash-outline" size={18} color={inUse ? t.textMuted : t.alert} />
-              </Pressable>
+              {confirming ? (
+                <>
+                  <Pressable
+                    onPress={() => {
+                      tapLight();
+                      removeCategory(c);
+                      setConfirmingRemove(null);
+                    }}
+                    hitSlop={8}>
+                    <Ionicons name="checkmark-circle" size={22} color={t.alert} />
+                  </Pressable>
+                  <Pressable onPress={() => setConfirmingRemove(null)} hitSlop={8}>
+                    <Ionicons name="close-circle" size={22} color={t.textMuted} />
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Pressable
+                    onPress={() => {
+                      setEditing(c);
+                      setDraft(c);
+                    }}
+                    hitSlop={8}>
+                    <Ionicons name="pencil-outline" size={18} color={t.text} />
+                  </Pressable>
+                  <Pressable hitSlop={8} onPress={() => !inUse && setConfirmingRemove(c)}>
+                    <Ionicons name="trash-outline" size={18} color={inUse ? t.textMuted : t.alert} />
+                  </Pressable>
+                </>
+              )}
             </Card>
           );
         })

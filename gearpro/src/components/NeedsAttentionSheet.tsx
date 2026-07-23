@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Sheet } from '@/components/form';
@@ -17,6 +18,7 @@ export function NeedsAttentionSheet({ visible, onClose }: Props) {
   const gear = useGearStore((s) => s.gear);
   const updateAssignment = useGearStore((s) => s.updateAssignment);
   const removeGear = useGearStore((s) => s.removeGear);
+  const [confirmingRemove, setConfirmingRemove] = useState<string | null>(null);
 
   const byId = gearMap(gear);
   const flagged = flaggedAssignments(trips);
@@ -53,50 +55,79 @@ export function NeedsAttentionSheet({ visible, onClose }: Props) {
                   "{assignment.statusReason}"
                 </Text>
               ) : null}
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-                <Pressable
-                  onPress={() => {
-                    updateAssignment(trip.id, assignment.id, { status: 'returned', statusReason: undefined });
-                    tapSuccess();
-                  }}
-                  style={{ flex: 1 }}>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      borderRadius: 10,
-                      borderWidth: 1,
-                      borderColor: t.border,
-                      paddingVertical: 10,
-                    }}>
-                    <Ionicons name="checkmark-circle-outline" size={16} color={t.text} />
-                    <Text style={{ fontFamily: font.bold, fontSize: 13, color: t.text }}>Add back</Text>
+              {confirmingRemove === assignment.id ? (
+                <View style={{ marginTop: 12, gap: 8 }}>
+                  <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.alert }}>
+                    Delete {item ? `${item.brand} ${item.name}` : 'this item'} from your library forever? This
+                    also removes it from every trip. This can&apos;t be undone.
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <Pressable onPress={() => setConfirmingRemove(null)} style={{ flex: 1 }}>
+                      <View
+                        style={{
+                          alignItems: 'center',
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: t.border,
+                          paddingVertical: 10,
+                        }}>
+                        <Text style={{ fontFamily: font.bold, fontSize: 13, color: t.text }}>Cancel</Text>
+                      </View>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        tapLight();
+                        removeGear(assignment.gearId);
+                        setConfirmingRemove(null);
+                      }}
+                      style={{ flex: 1 }}>
+                      <View style={{ alignItems: 'center', borderRadius: 10, backgroundColor: t.alert, paddingVertical: 10 }}>
+                        <Text style={{ fontFamily: font.bold, fontSize: 13, color: t.onPrimary }}>Delete forever</Text>
+                      </View>
+                    </Pressable>
                   </View>
-                </Pressable>
-                <Pressable
-                  onPress={() => {
-                    tapLight();
-                    removeGear(assignment.gearId);
-                  }}
-                  style={{ flex: 1 }}>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      borderRadius: 10,
-                      borderWidth: 1,
-                      borderColor: t.alert,
-                      paddingVertical: 10,
-                    }}>
-                    <Ionicons name="trash-outline" size={16} color={t.alert} />
-                    <Text style={{ fontFamily: font.bold, fontSize: 13, color: t.alert }}>Remove forever</Text>
-                  </View>
-                </Pressable>
-              </View>
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                  <Pressable
+                    onPress={() => {
+                      updateAssignment(trip.id, assignment.id, { status: 'returned', statusReason: undefined });
+                      tapSuccess();
+                    }}
+                    style={{ flex: 1 }}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: t.border,
+                        paddingVertical: 10,
+                      }}>
+                      <Ionicons name="checkmark-circle-outline" size={16} color={t.text} />
+                      <Text style={{ fontFamily: font.bold, fontSize: 13, color: t.text }}>Add back</Text>
+                    </View>
+                  </Pressable>
+                  <Pressable onPress={() => setConfirmingRemove(assignment.id)} style={{ flex: 1 }}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: t.alert,
+                        paddingVertical: 10,
+                      }}>
+                      <Ionicons name="trash-outline" size={16} color={t.alert} />
+                      <Text style={{ fontFamily: font.bold, fontSize: 13, color: t.alert }}>Remove forever</Text>
+                    </View>
+                  </Pressable>
+                </View>
+              )}
             </Card>
           );
         })

@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 import { CategoryFilterSheet } from '@/components/CategoryFilterSheet';
+import { ConfirmSheet } from '@/components/ConfirmSheet';
+import { ExpiringGearSheet } from '@/components/ExpiringGearSheet';
 import { GearFormModal } from '@/components/GearFormModal';
 import { ImportGearSheet } from '@/components/ImportGearSheet';
 import { ManageCategoriesSheet } from '@/components/ManageCategoriesSheet';
@@ -12,6 +14,7 @@ import { Card, Chip, Display, Screen, Touchable } from '@/components/ui';
 import { tapLight } from '@/lib/haptics';
 import { font, radius, useTheme } from '@/theme/tokens';
 import {
+  expiringGear,
   flaggedAssignments,
   GearItem,
   groupByCategory,
@@ -39,8 +42,11 @@ export default function GearScreen() {
   const [attentionOpen, setAttentionOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [categoryFilterOpen, setCategoryFilterOpen] = useState(false);
+  const [confirmGear, setConfirmGear] = useState<{ id: string; name: string } | null>(null);
+  const [expiringOpen, setExpiringOpen] = useState(false);
 
   const flaggedCount = useMemo(() => flaggedAssignments(trips).length, [trips]);
+  const expiringCount = useMemo(() => expiringGear(gear, today).length, [gear, today]);
 
   const usedCategories = useMemo(
     () => allCategories.filter((c) => gear.some((g) => g.category === c)),
@@ -121,7 +127,7 @@ export default function GearScreen() {
                   return;
                 }
                 tapLight();
-                removeGear(g.id);
+                setConfirmGear({ id: g.id, name: `${g.brand} ${g.name}`.trim() });
               }}>
               <Ionicons name="trash-outline" size={18} color={inUse ? t.textMuted : t.alert} />
             </Pressable>
@@ -163,6 +169,26 @@ export default function GearScreen() {
             <Ionicons name="alert-circle-outline" size={20} color={t.alertText} />
             <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.alertText, flex: 1 }}>
               {flaggedCount} item{flaggedCount === 1 ? '' : 's'} need{flaggedCount === 1 ? 's' : ''} attention
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color={t.alertText} />
+          </View>
+        </Pressable>
+      ) : null}
+
+      {expiringCount > 0 ? (
+        <Pressable onPress={() => setExpiringOpen(true)} style={{ marginBottom: 14 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+              backgroundColor: t.alertSoft,
+              borderRadius: 14,
+              padding: 14,
+            }}>
+            <Ionicons name="time-outline" size={20} color={t.alertText} />
+            <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.alertText, flex: 1 }}>
+              {expiringCount} item{expiringCount === 1 ? '' : 's'} expired or expiring soon
             </Text>
             <Ionicons name="chevron-forward" size={18} color={t.alertText} />
           </View>
@@ -294,6 +320,11 @@ export default function GearScreen() {
       />
       <ImportGearSheet visible={importOpen} onClose={() => setImportOpen(false)} />
       <NeedsAttentionSheet visible={attentionOpen} onClose={() => setAttentionOpen(false)} />
+      <ExpiringGearSheet
+        visible={expiringOpen}
+        onClose={() => setExpiringOpen(false)}
+        onEdit={(id) => setModal({ open: true, editId: id })}
+      />
       <ManageCategoriesSheet visible={categoriesOpen} onClose={() => setCategoriesOpen(false)} />
       <CategoryFilterSheet
         visible={categoryFilterOpen}
@@ -303,6 +334,16 @@ export default function GearScreen() {
         totalCount={gear.length}
         activeCategory={activeCategory}
         onSelect={setActiveCategory}
+      />
+      <ConfirmSheet
+        visible={confirmGear !== null}
+        title="Delete gear?"
+        message={confirmGear ? `Delete "${confirmGear.name}" from your library? This can't be undone.` : ''}
+        confirmLabel="Delete gear"
+        onConfirm={() => {
+          if (confirmGear) removeGear(confirmGear.id);
+        }}
+        onClose={() => setConfirmGear(null)}
       />
     </Screen>
   );

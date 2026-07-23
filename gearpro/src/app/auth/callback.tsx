@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Text, View } from 'react-native';
 
@@ -11,7 +11,7 @@ export default function AuthCallback() {
   const navigated = useRef(false);
 
   useEffect(() => {
-    const go = (href: string) => {
+    const go = (href: Href) => {
       if (navigated.current) return;
       navigated.current = true;
       router.replace(href);

@@ -5,8 +5,16 @@ import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Button, ChipPicker, Field, Label, Sheet } from '@/components/form';
+import { DatePickerSheet } from '@/components/DatePickerSheet';
 import { font, useTheme } from '@/theme/tokens';
 import { useGearStore } from '@/store/useGearStore';
+
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function fmtDate(s: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return '';
+  return `${MONTHS_SHORT[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}`;
+}
 
 type Props = { visible: boolean; onClose: () => void; editId?: string | null; notice?: string };
 
@@ -36,10 +44,13 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
   const editing = editId ? gear.find((g) => g.id === editId) : null;
   const [form, setForm] = useState(blank);
   const [error, setError] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
     setError('');
+    setConfirmingDelete(false);
     setForm(
       editing
         ? {
@@ -179,13 +190,38 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
         </View>
       </View>
 
-      <Field
-        label="Expiration date (optional)"
-        value={form.expiration}
-        onChangeText={(v) => setForm((f) => ({ ...f, expiration: v }))}
-        placeholder="2026-12-31"
-        autoCapitalize="none"
-      />
+      <Label>Expiration date (optional)</Label>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+        <Pressable onPress={() => setDatePickerOpen(true)} style={{ flex: 1 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+              backgroundColor: t.surface,
+              borderWidth: 1,
+              borderColor: t.border,
+              borderRadius: 12,
+              paddingHorizontal: 14,
+              height: 48,
+            }}>
+            <Ionicons name="calendar-outline" size={18} color={t.textMuted} />
+            <Text
+              style={{
+                fontFamily: font.medium,
+                fontSize: 15,
+                color: form.expiration ? t.text : t.textMuted,
+              }}>
+              {form.expiration ? fmtDate(form.expiration) : 'Add expiration date'}
+            </Text>
+          </View>
+        </Pressable>
+        {form.expiration ? (
+          <Pressable onPress={() => setForm((f) => ({ ...f, expiration: '' }))} hitSlop={8}>
+            <Ionicons name="close-circle" size={22} color={t.textMuted} />
+          </Pressable>
+        ) : null}
+      </View>
 
       <Field label="Notes" value={form.notes} onChangeText={(v) => setForm((f) => ({ ...f, notes: v }))} placeholder="Maintenance, fit, replacement…" multiline />
 
@@ -212,18 +248,34 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
                 Can't delete — assigned to a trip. Remove it there first.
               </Text>
             </View>
+          ) : confirmingDelete ? (
+            <View style={{ gap: 8 }}>
+              <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, textAlign: 'center' }}>
+                Delete {editing.brand} {editing.name} forever? This can&apos;t be undone.
+              </Text>
+              <Button
+                label="Yes, delete"
+                tone="danger"
+                onPress={() => {
+                  removeGear(editing.id);
+                  onClose();
+                }}
+              />
+              <Button label="Cancel" tone="ghost" onPress={() => setConfirmingDelete(false)} />
+            </View>
           ) : (
-            <Button
-              label="Delete gear"
-              tone="danger"
-              onPress={() => {
-                removeGear(editing.id);
-                onClose();
-              }}
-            />
+            <Button label="Delete gear" tone="danger" onPress={() => setConfirmingDelete(true)} />
           )}
         </View>
       ) : null}
+
+      <DatePickerSheet
+        visible={datePickerOpen}
+        value={form.expiration}
+        title="Expiration date"
+        onChange={(v) => setForm((f) => ({ ...f, expiration: v }))}
+        onClose={() => setDatePickerOpen(false)}
+      />
     </Sheet>
   );
 }

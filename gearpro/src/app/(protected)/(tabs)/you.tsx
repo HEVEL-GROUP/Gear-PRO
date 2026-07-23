@@ -201,7 +201,7 @@ export default function YouScreen() {
       </Pressable>
 
       <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, textAlign: 'center', marginTop: 16 }}>
-        Gear Pro v2 · web preview
+        Gear Pro
       </Text>
 
       <ClearDemoDataSheet visible={demoSheetOpen} onClose={() => setDemoSheetOpen(false)} />

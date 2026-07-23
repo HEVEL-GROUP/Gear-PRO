@@ -22,10 +22,12 @@ export function BagFormSheet({ visible, onClose, tripId, editBagId }: Props) {
   const [maxW, setMaxW] = useState('35');
   const [color, setColor] = useState(BAG_COLORS[0]);
   const [error, setError] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
     setError('');
+    setConfirmingDelete(false);
     if (editing) {
       setLabel(editing.label);
       setMaxW(String(editing.maxWeightLb));
@@ -82,15 +84,25 @@ export function BagFormSheet({ visible, onClose, tripId, editBagId }: Props) {
       ) : null}
       <Button label={editing ? 'Save bag' : 'Add bag'} onPress={save} />
       {editing && canDelete ? (
-        <View style={{ marginTop: 10 }}>
-          <Button
-            label="Delete bag & its gear"
-            tone="danger"
-            onPress={() => {
-              removeBag(tripId, editing.id);
-              onClose();
-            }}
-          />
+        <View style={{ marginTop: 10, gap: 8 }}>
+          {confirmingDelete ? (
+            <>
+              <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, textAlign: 'center' }}>
+                Delete {editing.label} and everything packed in it? This can&apos;t be undone.
+              </Text>
+              <Button
+                label="Yes, delete bag"
+                tone="danger"
+                onPress={() => {
+                  removeBag(tripId, editing.id);
+                  onClose();
+                }}
+              />
+              <Button label="Cancel" tone="ghost" onPress={() => setConfirmingDelete(false)} />
+            </>
+          ) : (
+            <Button label="Delete bag & its gear" tone="danger" onPress={() => setConfirmingDelete(true)} />
+          )}
         </View>
       ) : null}
       {editing && !canDelete ? (

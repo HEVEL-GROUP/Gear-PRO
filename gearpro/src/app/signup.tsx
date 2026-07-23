@@ -55,7 +55,10 @@ export default function SignupScreen() {
       return;
     }
     if (data.session) {
-      // Email confirmation is disabled on this project — already signed in.
+      // Email confirmation is ON, so signUp normally returns no session and we
+      // fall through to the check-email screen below. But if the project is
+      // ever switched to auto-confirm, signUp returns a session immediately --
+      // handle that by going straight into the app.
       router.replace('/home');
       return;
     }
