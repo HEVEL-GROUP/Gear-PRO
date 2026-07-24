@@ -2,6 +2,9 @@
   "name": "gearpro",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "engines": {
+    "node": "20.x"
+  },
   "dependencies": {
     "@expo-google-fonts/caprasimo": "^0.4.0",
     "@expo-google-fonts/figtree": "^0.4.1",
