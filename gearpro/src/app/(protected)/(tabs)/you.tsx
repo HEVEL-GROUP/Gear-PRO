@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { type Href, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
 import { Button } from '@/components/form';
 import { ClearDemoDataSheet } from '@/components/ClearDemoDataSheet';
@@ -11,6 +11,7 @@ import { Card, Display, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { exportData } from '@/lib/export';
 import { tapLight } from '@/lib/haptics';
+import { useProfile } from '@/lib/profile/useProfile';
 import { openBillingPortal } from '@/lib/stripe/checkout';
 import { usePro } from '@/lib/stripe/usePro';
 import { demoDataCounts, useGearStore } from '@/store/useGearStore';
@@ -52,6 +53,10 @@ export default function YouScreen() {
   const isWide = width >= 880;
   const { session, signOut } = useAuth();
   const { planType, source, trialEndsAt } = usePro();
+  const { displayName, save: saveDisplayName } = useProfile();
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [nameSaving, setNameSaving] = useState(false);
   const gear = useGearStore((s) => s.gear);
   const trips = useGearStore((s) => s.trips);
   const resetLocal = useGearStore((s) => s.resetLocal);
@@ -67,6 +72,23 @@ export default function YouScreen() {
   const hasStripeBilling = source === 'stripe';
   const demoCounts = useMemo(() => demoDataCounts(gear, trips), [gear, trips]);
   const hasDemoData = demoCounts.gear > 0 || demoCounts.trips > 0;
+
+  const startEditName = () => {
+    setNameDraft(displayName ?? '');
+    setEditingName(true);
+  };
+  const commitName = async () => {
+    if (nameSaving) return;
+    setNameSaving(true);
+    try {
+      await saveDisplayName(nameDraft);
+      setEditingName(false);
+    } catch {
+      // leave the field open so the user can retry
+    } finally {
+      setNameSaving(false);
+    }
+  };
 
   const handleBilling = async (action: () => Promise<void>) => {
     if (billingBusy) return;
@@ -89,9 +111,46 @@ export default function YouScreen() {
 
       <Card style={{ alignItems: 'center', paddingVertical: 22 }}>
         <Mark size={44} fill={t.primary} check={t.mode === 'dark' ? t.bg : t.cream} />
-        <Display style={{ fontSize: 20, marginTop: 10 }}>Gear Pro</Display>
-        <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginTop: 2 }}>
-          Signed in as {session?.user.email}
+        {editingName ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, width: '100%', maxWidth: 320 }}>
+            <TextInput
+              value={nameDraft}
+              onChangeText={setNameDraft}
+              onSubmitEditing={commitName}
+              autoFocus
+              placeholder="Your name"
+              placeholderTextColor={t.textMuted}
+              maxLength={40}
+              style={{
+                flex: 1,
+                fontFamily: font.bold,
+                fontSize: 18,
+                color: t.text,
+                textAlign: 'center',
+                borderBottomWidth: 1,
+                borderColor: t.border,
+                paddingVertical: 4,
+              }}
+            />
+            <Pressable onPress={commitName} hitSlop={8}>
+              <Ionicons name="checkmark-circle" size={24} color={t.primary} />
+            </Pressable>
+            <Pressable onPress={() => setEditingName(false)} hitSlop={8}>
+              <Ionicons name="close-circle" size={24} color={t.textMuted} />
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={startEditName}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}>
+            <Display style={{ fontSize: 20, color: displayName ? t.text : t.textMuted }}>
+              {displayName || 'Add your name'}
+            </Display>
+            <Ionicons name="pencil-outline" size={16} color={t.textMuted} />
+          </Pressable>
+        )}
+        <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginTop: 4 }}>
+          {session?.user.email}
         </Text>
       </Card>
 
