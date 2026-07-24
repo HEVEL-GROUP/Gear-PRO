@@ -293,16 +293,40 @@ type StoreState = {
   // from view for an unrelated reason (losing access to a shared trip), which
   // must never be mistaken for the user deleting their own row.
   pendingDeletes: PendingDeletes;
+  // Which authenticated user the CURRENT local gear/trips belongs to, or null
+  // if it's never been confirmed for anyone (a fresh install, or right after
+  // resetLocal). Local storage is one browser-wide store, not scoped per
+  // Supabase user -- this is what lets the sync layer tell "am I looking at
+  // MY data" apart from "this is leftover from whoever was here before me,"
+  // which matters the moment a session appears for a DIFFERENT user than
+  // last confirmed (see ensureLocalOwnedBy in lib/sync).
+  syncedForUserId: string | null;
+  setSyncedForUserId: (id: string | null) => void;
   addCategory: (name: string) => void;
   renameCategory: (oldName: string, newName: string) => void;
   removeCategory: (name: string) => void;
   clearDemoData: () => void;
+  // Reseeds the onboarding demo content -- used when syncOnLogin determines an
+  // account is genuinely new (or a returning account that has legitimately
+  // emptied itself) so it shows something instead of a blank library. Pure
+  // local state; pushToCloud already excludes isDemo rows unconditionally, so
+  // this can never upload anything to the cloud.
+  seedDemoData: () => void;
   resetLocal: () => void;
   addGear: (item: Omit<GearItem, 'id'>) => void;
   updateGear: (id: string, patch: Partial<GearItem>) => void;
   removeGear: (id: string) => void;
   removeGearBulk: (ids: string[]) => void;
   addTrip: (trip: Omit<Trip, 'id'>) => string;
+  // Scoped to just the fields the trip-edit form actually owns -- name,
+  // location, and dates. Deliberately excludes bags/assignments/isDemo/
+  // ownerId/shared/shareToken, which are each managed by their own dedicated
+  // mutators or the sharing RPCs, so a generic patch here can't accidentally
+  // clobber them.
+  updateTrip: (
+    id: string,
+    patch: Partial<Pick<Trip, 'name' | 'location' | 'locationLat' | 'locationLon' | 'startDate' | 'endDate'>>,
+  ) => void;
   removeTrip: (id: string) => void;
   addAssignment: (tripId: string, bagId: string, gearId: string, quantity?: number) => void;
   updateAssignment: (tripId: string, assignmentId: string, patch: Partial<Assignment>) => void;
@@ -336,6 +360,8 @@ export const useGearStore = create<StoreState>()(
       sharedGearById: {},
       syncBaseline: {},
       pendingDeletes: emptyPendingDeletes(),
+      syncedForUserId: null,
+      setSyncedForUserId: (id) => set({ syncedForUserId: id }),
       setSyncDirty: (v) => set({ syncDirty: v }),
       // Custom categories tack onto the fixed CATEGORIES list (kept in sync
       // via `categories`, which is what every picker/grouping reads from) --
@@ -393,6 +419,16 @@ export const useGearStore = create<StoreState>()(
               })),
           };
         }),
+      // Reseeds the same onboarding demo content a fresh install starts with.
+      // syncOnLogin only calls this once it has already confirmed local holds
+      // no real content, so this never clobbers anything the account has.
+      seedDemoData: () =>
+        set({
+          gear: seedGear,
+          trips: seedTrips(),
+          categories: CATEGORIES,
+          customCategories: [],
+        }),
       // Clears this device back to a signed-out EMPTY state -- run on sign-out
       // (and before account deletion) so a second account signing in on the same
       // device never inherits the first account's local cache. It resets to
@@ -401,6 +437,12 @@ export const useGearStore = create<StoreState>()(
       // be re-planted on logout. Re-seeding demo here caused it to keep coming
       // back -- after "Clear demo data" emptied the cloud, logout re-seeded demo
       // locally and the next login (seeing an empty cloud) re-uploaded it.
+      // syncOnLogin is what reseeds demo now, and only once it has confirmed
+      // (via the cloud) that the account signing in is actually new/empty.
+      //
+      // Also clears syncedForUserId back to null, so the next login can't
+      // mistake this reset-to-empty state for "confirmed belongs to nobody in
+      // particular, therefore safe to push as-is" -- see ensureLocalOwnedBy.
       //
       // Wrapped in the localResetInProgress flag: zustand notifies subscribers
       // synchronously inside set(), so the cloud-sync subscriber sees the flag
@@ -418,6 +460,7 @@ export const useGearStore = create<StoreState>()(
             sharedGearById: {},
             syncBaseline: {},
             pendingDeletes: emptyPendingDeletes(),
+            syncedForUserId: null,
           });
         } finally {
           localResetInProgress = false;
@@ -477,6 +520,10 @@ export const useGearStore = create<StoreState>()(
         set((s) => ({ trips: [...s.trips, { ...trip, id }] }));
         return id;
       },
+      updateTrip: (id, patch) =>
+        set((s) => ({
+          trips: s.trips.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+        })),
       // Cascades the tombstone to the trip's own bags/assignments -- without
       // this, a deleted trip's children stay "live" in the cloud with no
       // parent visible anywhere, and a future pull has no way to know they
@@ -628,17 +675,25 @@ export const useGearStore = create<StoreState>()(
     {
       name: 'gearpro-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 2,
+      version: 3,
       // v1 -> v2: adds syncBaseline/pendingDeletes for per-row sync. Every
       // pre-existing local row is simply "not yet in baseline" -- which the
       // new sync layer already treats as "trust the cloud for this row until
       // I've confirmed a sync for it," so no data needs touching here, just
       // backfilling the two new fields so older persisted state has them.
+      // v2 -> v3: adds syncedForUserId. null is the correct backfill for
+      // EVERY existing install regardless of whose data is actually sitting
+      // in local storage right now -- the field only exists to catch a FUTURE
+      // user switch, and next login will confirm-and-set it for whoever's
+      // signed in, so there's nothing to reconstruct retroactively here.
       migrate: (persisted, version) => {
         const state = persisted as StoreState;
         if (version < 2) {
           state.syncBaseline = {};
           state.pendingDeletes = emptyPendingDeletes();
+        }
+        if (version < 3) {
+          state.syncedForUserId = null;
         }
         return state;
       },

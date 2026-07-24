@@ -357,6 +357,39 @@ describe('useGearStore', () => {
     });
   });
 
+  describe('updateTrip', () => {
+    it('patches name/location/dates in place, leaving bags/assignments/id untouched', () => {
+      const tripId = useGearStore.getState().addTrip({
+        name: 'Old name', location: 'Old place', startDate: '2026-08-01', endDate: '2026-08-05',
+        bags: [], assignments: [],
+      });
+      useGearStore.getState().addBag(tripId, { label: 'Pack', maxWeightLb: 40, color: '#000' });
+
+      useGearStore.getState().updateTrip(tripId, {
+        name: 'New name', location: 'New place', startDate: '2026-09-01', endDate: '2026-09-05',
+      });
+
+      const trip = useGearStore.getState().trips.find((t) => t.id === tripId)!;
+      expect(trip.name).toBe('New name');
+      expect(trip.location).toBe('New place');
+      expect(trip.startDate).toBe('2026-09-01');
+      expect(trip.endDate).toBe('2026-09-05');
+      expect(trip.id).toBe(tripId);
+      expect(trip.bags).toHaveLength(1);
+    });
+
+    it('is a no-op for any other trip id', () => {
+      const tripId = useGearStore.getState().addTrip({
+        name: 'Trip', location: '', startDate: '', endDate: '', bags: [], assignments: [],
+      });
+      const before = useGearStore.getState().trips.find((t) => t.id === tripId);
+
+      useGearStore.getState().updateTrip('does-not-exist', { name: 'Should not apply' });
+
+      expect(useGearStore.getState().trips.find((t) => t.id === tripId)).toEqual(before);
+    });
+  });
+
   describe('removeBag (cascade tombstones)', () => {
     it('records the bag AND its assignments in pendingDeletes, leaving other bags untouched', () => {
       const tripId = useGearStore.getState().addTrip({
