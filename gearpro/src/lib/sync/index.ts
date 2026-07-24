@@ -106,11 +106,20 @@ async function deleteMissing(table: string, keepIds: string[]) {
  */
 export async function pushToCloud(userId: string): Promise<void> {
   const { gear, trips } = useGearStore.getState();
+  // A row is the current user's if it has no ownerId (created locally) or its
+  // ownerId is theirs. We push ONLY those -- a shared trip owned by someone
+  // else, and any teammate's bags/assignments on a shared trip, are read-only
+  // here and must never be re-uploaded (RLS would reject them and break sync).
+  const mine = (ownerId?: string) => !ownerId || ownerId === userId;
 
-  const gearRows = gear.map((g) => toGearRow(userId, g));
-  const tripRows = trips.map((t) => toTripRow(userId, t));
-  const bagRows = trips.flatMap((t) => t.bags.map((b) => toBagRow(userId, t.id, b)));
-  const assignmentRows = trips.flatMap((t) => t.assignments.map((a) => toAssignmentRow(userId, t.id, a)));
+  const gearRows = gear.filter((g) => mine(g.ownerId)).map((g) => toGearRow(userId, g));
+  const tripRows = trips.filter((t) => mine(t.ownerId)).map((t) => toTripRow(userId, t));
+  // Bags/assignments can be the user's own even on a trip they don't own
+  // (co-op packing), so scan every trip but keep only their own rows.
+  const bagRows = trips.flatMap((t) => t.bags.filter((b) => mine(b.ownerId)).map((b) => toBagRow(userId, t.id, b)));
+  const assignmentRows = trips.flatMap((t) =>
+    t.assignments.filter((a) => mine(a.ownerId)).map((a) => toAssignmentRow(userId, t.id, a)),
+  );
 
   // Parents before children (FK order); upsert-by-id is safe to re-run.
   if (gearRows.length) {
@@ -137,8 +146,14 @@ export async function pushToCloud(userId: string): Promise<void> {
   await deleteMissing('trips', tripRows.map((r) => r.id));
 }
 
-/** Replaces local state with whatever's in the cloud for this user. */
-export async function pullFromCloud(): Promise<void> {
+/**
+ * Replaces local state with everything visible to this user in the cloud --
+ * their own data AND any shared trips they're a member of (RLS decides what's
+ * visible). Rows are tagged with ownerId; the user's own gear goes to `gear`
+ * (the library) while teammates' gear that's on a shared trip is kept separate
+ * in `sharedGearById` so it never appears in the user's own Gear list.
+ */
+export async function pullFromCloud(userId: string): Promise<void> {
   const [gearRes, tripsRes, bagsRes, assignmentsRes] = await Promise.all([
     supabase.from('gear_items').select('*'),
     supabase.from('trips').select('*'),
@@ -150,22 +165,29 @@ export async function pullFromCloud(): Promise<void> {
   if (bagsRes.error) throw bagsRes.error;
   if (assignmentsRes.error) throw assignmentsRes.error;
 
-  const gear: GearItem[] = (gearRes.data ?? []).map((r) => ({
-    id: r.id,
-    brand: r.brand ?? '',
-    name: r.name,
-    category: r.category,
-    weightLb: Number(r.weight_lb),
-    quantity: r.quantity,
-    notes: r.notes ?? undefined,
-    expiration: r.expiration ?? undefined,
-    photoUri: r.photo_uri ?? undefined,
-    isDemo: r.is_demo ?? false,
-  }));
+  const gear: GearItem[] = [];
+  const sharedGearById: Record<string, GearItem> = {};
+  for (const r of gearRes.data ?? []) {
+    const g: GearItem = {
+      id: r.id,
+      brand: r.brand ?? '',
+      name: r.name,
+      category: r.category,
+      weightLb: Number(r.weight_lb),
+      quantity: r.quantity,
+      notes: r.notes ?? undefined,
+      expiration: r.expiration ?? undefined,
+      photoUri: r.photo_uri ?? undefined,
+      isDemo: r.is_demo ?? false,
+      ownerId: r.user_id,
+    };
+    if (r.user_id === userId) gear.push(g);
+    else sharedGearById[g.id] = g;
+  }
 
   const bagsByTrip = new Map<string, Bag[]>();
   for (const r of bagsRes.data ?? []) {
-    const bag: Bag = { id: r.id, label: r.label, maxWeightLb: Number(r.max_weight_lb), color: r.color };
+    const bag: Bag = { id: r.id, label: r.label, maxWeightLb: Number(r.max_weight_lb), color: r.color, ownerId: r.user_id };
     bagsByTrip.set(r.trip_id, [...(bagsByTrip.get(r.trip_id) ?? []), bag]);
   }
 
@@ -178,6 +200,7 @@ export async function pullFromCloud(): Promise<void> {
       quantity: r.quantity,
       status: r.status,
       statusReason: r.status_reason ?? undefined,
+      ownerId: r.user_id,
     };
     assignmentsByTrip.set(r.trip_id, [...(assignmentsByTrip.get(r.trip_id) ?? []), a]);
   }
@@ -193,10 +216,12 @@ export async function pullFromCloud(): Promise<void> {
     bags: bagsByTrip.get(r.id) ?? [],
     assignments: assignmentsByTrip.get(r.id) ?? [],
     isDemo: r.is_demo ?? false,
+    ownerId: r.user_id,
+    shared: r.user_id !== userId,
   }));
 
   // A pull makes local an exact copy of the cloud, so there is nothing unsynced.
-  useGearStore.setState({ gear, trips, syncDirty: false });
+  useGearStore.setState({ gear, trips, sharedGearById, syncDirty: false });
 }
 
 async function pushLocal(userId: string): Promise<void> {
@@ -216,15 +241,17 @@ async function pushLocal(userId: string): Promise<void> {
  *    work the user already made (e.g. edited offline, then relaunched).
  *  - Cloud has data and local is clean -> cloud is authoritative, pull.
  *
- * The cloud-empty check counts gear AND trips (not trips alone) so a user who
- * has catalogued gear but not planned a trip yet is treated as "has cloud
- * data" and pulled, never pushed -- otherwise a reinstall would upload the
- * fresh demo seed and wipe their real gear library.
+ * The cloud-empty check counts the user's OWN gear AND trips (filtered by
+ * user_id, not just what's visible -- a shared trip they joined must NOT count
+ * as "has cloud data", or their own first upload would never happen). Counting
+ * gear as well as trips means a user who catalogued gear but hasn't planned a
+ * trip is still treated as having cloud data and pulled, never pushed --
+ * otherwise a reinstall would upload the fresh demo seed and wipe their library.
  */
 export async function syncOnLogin(userId: string): Promise<void> {
   const [gearRes, tripsRes] = await Promise.all([
-    supabase.from('gear_items').select('id', { count: 'exact', head: true }),
-    supabase.from('trips').select('id', { count: 'exact', head: true }),
+    supabase.from('gear_items').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    supabase.from('trips').select('id', { count: 'exact', head: true }).eq('user_id', userId),
   ]);
   if (gearRes.error) throw gearRes.error;
   if (tripsRes.error) throw tripsRes.error;
@@ -235,6 +262,6 @@ export async function syncOnLogin(userId: string): Promise<void> {
   if (!cloudHasData || localDirty) {
     await pushLocal(userId);
   } else {
-    await pullFromCloud();
+    await pullFromCloud(userId);
   }
 }

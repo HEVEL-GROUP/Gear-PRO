@@ -26,9 +26,14 @@ export type GearItem = {
   // otherwise erase the "is this demo data" signal for every user who ever
   // logs in.
   isDemo?: boolean;
+  ownerId?: string;
 };
 
-export type Bag = { id: string; label: string; maxWeightLb: number; color: string };
+// ownerId is set by the cloud sync layer from the row's user_id. It's absent on
+// rows created locally (which are always the current user's) and present on
+// rows pulled from a SHARED trip, so the sync layer knows to push only the
+// user's OWN rows -- never a teammate's -- and the UI knows whose gear it is.
+export type Bag = { id: string; label: string; maxWeightLb: number; color: string; ownerId?: string };
 
 export type Assignment = {
   id: string;
@@ -38,6 +43,7 @@ export type Assignment = {
   status: GearStatus;
   statusReason?: string;
   essential?: boolean;
+  ownerId?: string;
 };
 
 export type Trip = {
@@ -51,6 +57,10 @@ export type Trip = {
   bags: Bag[];
   assignments: Assignment[];
   isDemo?: boolean;
+  // Set on pull: who owns the trip, and whether it's a trip shared WITH me
+  // (someone else's). Owner-only fields; absent on locally-created trips.
+  ownerId?: string;
+  shared?: boolean;
 };
 
 export const STATUS_LABELS: Record<GearStatus, string> = {
@@ -217,6 +227,11 @@ type StoreState = {
   // unsynced work. Cleared only after a verified successful push or a pull.
   syncDirty: boolean;
   setSyncDirty: (v: boolean) => void;
+  // Teammates' gear that's assigned to a shared trip, keyed by gear id. Kept
+  // OUT of `gear` (which is the user's own library only) so the Gear screen
+  // never shows a teammate's items -- the shared-trip view resolves gear names
+  // and weights from here when an assignment's gear isn't in `gear`.
+  sharedGearById: Record<string, GearItem>;
   addCategory: (name: string) => void;
   renameCategory: (oldName: string, newName: string) => void;
   removeCategory: (name: string) => void;
@@ -245,6 +260,7 @@ export const useGearStore = create<StoreState>()(
       categories: CATEGORIES,
       customCategories: [],
       syncDirty: false,
+      sharedGearById: {},
       setSyncDirty: (v) => set({ syncDirty: v }),
       // Custom categories tack onto the fixed CATEGORIES list (kept in sync
       // via `categories`, which is what every picker/grouping reads from) --
@@ -313,6 +329,7 @@ export const useGearStore = create<StoreState>()(
           categories: CATEGORIES,
           customCategories: [],
           syncDirty: false,
+          sharedGearById: {},
         }),
       addGear: (item) => set((s) => ({ gear: [...s.gear, { ...item, id: uid() }] })),
       updateGear: (id, patch) =>
