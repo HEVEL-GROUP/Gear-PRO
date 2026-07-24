@@ -8,7 +8,6 @@ import { font, useTheme } from '@/theme/tokens';
 const NAV_ITEMS = [
   { href: '/home', label: 'Trips', icon: 'map-outline' },
   { href: '/gear', label: 'Gear', icon: 'cube-outline' },
-  { href: '/pack', label: 'Pack', icon: 'list-outline' },
   { href: '/you', label: 'You', icon: 'person-outline' },
 ] as const;
 

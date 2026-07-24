@@ -542,17 +542,6 @@ export function expiringGear(gear: GearItem[], today: string, withinDays = 90): 
     .sort((x, y) => (x.expiration! < y.expiration! ? -1 : x.expiration! > y.expiration! ? 1 : 0));
 }
 
-// Every currently-packed (checked_out) assignment across all trips, newest trip first.
-export function allPackedAssignments(
-  trips: Trip[],
-): { trip: Trip; assignment: Assignment }[] {
-  return trips.flatMap((trip) =>
-    trip.assignments
-      .filter((a) => a.status === 'checked_out')
-      .map((assignment) => ({ trip, assignment })),
-  );
-}
-
 // Every assignment checked in as broken, lost, or consumed -- the "needs
 // attention" list: gear that's out of the available pool until someone
 // either fixes/restocks and adds it back, or removes it for good.
