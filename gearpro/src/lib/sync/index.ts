@@ -503,6 +503,8 @@ export async function pullFromCloud(
  * would just re-upload its stale pre-deletion copy.
  */
 export async function syncOnLogin(userId: string): Promise<void> {
+  ensureLocalOwnedBy(userId);
+
   const [gearRes, tripsRes] = await Promise.all([
     supabase.from('gear_items').select('id', { count: 'exact', head: true }).eq('user_id', userId),
     supabase.from('trips').select('id', { count: 'exact', head: true }).eq('user_id', userId),
@@ -513,10 +515,41 @@ export async function syncOnLogin(userId: string): Promise<void> {
   const cloudHasData = (gearRes.count ?? 0) > 0 || (tripsRes.count ?? 0) > 0;
 
   if (!cloudHasData) {
+    // Genuinely new account, or a returning one that has deleted everything
+    // it owns -- either way, show something instead of a blank library.
+    const cur = useGearStore.getState();
+    const hasRealContent = cur.gear.some((it) => !it.isDemo) || cur.trips.some((t) => !t.isDemo);
+    if (!hasRealContent) useGearStore.getState().seedDemoData();
     await pushToCloud(userId);
   } else {
     await pullFromCloud(userId);
     await pushToCloud(userId);
   }
   useGearStore.getState().setSyncDirty(false);
+  useGearStore.getState().setSyncedForUserId(userId);
+}
+
+/**
+ * Local storage is one browser-wide store, not scoped per Supabase user. If
+ * the local data was last confirmed for a DIFFERENT user than the one
+ * signing in now (switched accounts in the same browser without -- or before
+ * -- a clean logout), treat it exactly like a logout: reset to empty rather
+ * than let the new session inherit, or worse upload, a stranger's data.
+ *
+ * A null syncedForUserId (fresh install, or right after resetLocal) is NOT
+ * treated as a mismatch -- there's nothing to protect against yet, and
+ * demo-seeded local state from a truly fresh install should survive this
+ * check untouched.
+ *
+ * Synchronous and cheap (resetLocal's set() call has no network step), so
+ * every entry point that's about to read or write local gear/trip data on
+ * behalf of a specific user should call this FIRST -- syncOnLogin does, and
+ * so does joinTripByToken, since /join/[token] is reachable without ever
+ * mounting the layout that runs syncOnLogin (see sharing.ts).
+ */
+export function ensureLocalOwnedBy(userId: string): void {
+  const current = useGearStore.getState().syncedForUserId;
+  if (current && current !== userId) {
+    useGearStore.getState().resetLocal();
+  }
 }

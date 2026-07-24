@@ -10,7 +10,7 @@ jest.mock('@/lib/supabase/client', () => ({
 }));
 
 import { fakeSupabase, resetFakeSupabase } from './fakeSupabase';
-import { pullFromCloud, pushToCloud, syncOnLogin } from './index';
+import { ensureLocalOwnedBy, pullFromCloud, pushToCloud, syncOnLogin } from './index';
 import { hashGear, uid, useGearStore } from '@/store/useGearStore';
 
 const USER = 'aaaaaaaa-0000-0000-0000-000000000001';
@@ -229,5 +229,70 @@ describe('syncOnLogin', () => {
 
     expect(fakeSupabase.tables.gear_items.get(realId)?.deleted_at).toBeFalsy();
     expect(useGearStore.getState().gear.some((g) => g.id === realId)).toBe(true);
+  });
+
+  it('REGRESSION: reseeds the onboarding demo when an account is confirmed new/empty and local holds no real content (a signup right after a logout in the same browser must not land on a blank library)', async () => {
+    // Exactly what resetLocal() leaves behind, e.g. right after logging out.
+    useGearStore.getState().resetLocal();
+    expect(useGearStore.getState().gear).toHaveLength(0);
+
+    await syncOnLogin(USER); // cloud is empty for USER -- a genuine first-ever signup
+
+    const { gear, trips } = useGearStore.getState();
+    expect(gear.length).toBeGreaterThan(0);
+    expect(gear.every((g) => g.isDemo)).toBe(true);
+    expect(trips.length).toBeGreaterThan(0);
+  });
+
+  it('does NOT reseed demo over real content the account already has locally (e.g. offline-created gear on a brand-new account, not yet pushed)', async () => {
+    const id = uid();
+    useGearStore.setState({
+      gear: [{ id, brand: 'Real', name: 'Added offline before first sync', category: 'Other', weightLb: 1, quantity: 1 }],
+    });
+
+    await syncOnLogin(USER); // cloud still empty -- first sync
+
+    const { gear } = useGearStore.getState();
+    expect(gear.some((g) => g.id === id)).toBe(true);
+    expect(gear.some((g) => g.isDemo)).toBe(false); // no demo clutter alongside real content
+  });
+
+  it('records syncedForUserId after a successful run', async () => {
+    await syncOnLogin(USER);
+    expect(useGearStore.getState().syncedForUserId).toBe(USER);
+  });
+});
+
+describe('ensureLocalOwnedBy', () => {
+  it('resets local to empty when it was last confirmed for a DIFFERENT user (switched accounts in the same browser)', () => {
+    useGearStore.setState({
+      gear: [{ id: uid(), brand: 'A', name: "Previous user's real gear", category: 'Other', weightLb: 1, quantity: 1 }],
+      syncedForUserId: OTHER_USER,
+    });
+
+    ensureLocalOwnedBy(USER);
+
+    expect(useGearStore.getState().gear).toHaveLength(0);
+    expect(useGearStore.getState().syncedForUserId).toBeNull();
+  });
+
+  it('does nothing when local has never been confirmed for anyone (fresh install, syncedForUserId null) -- demo-seeded local state survives untouched', () => {
+    const before = useGearStore.getState().gear;
+
+    ensureLocalOwnedBy(USER);
+
+    expect(useGearStore.getState().gear).toBe(before); // same reference -- no reset ran
+  });
+
+  it('does nothing when local already belongs to this same user', () => {
+    useGearStore.setState({
+      gear: [{ id: uid(), brand: 'A', name: 'Mine', category: 'Other', weightLb: 1, quantity: 1 }],
+      syncedForUserId: USER,
+    });
+    const before = useGearStore.getState().gear;
+
+    ensureLocalOwnedBy(USER);
+
+    expect(useGearStore.getState().gear).toBe(before);
   });
 });
