@@ -1,4 +1,4 @@
-import { Redirect, useRouter } from 'expo-router';
+import { type Href, Redirect, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -82,6 +82,10 @@ export default function LoginScreen() {
       ) : null}
 
       <Button label={submitting ? 'Logging in…' : 'Log in'} onPress={onSubmit} />
+
+      <Pressable onPress={() => router.push('/forgot-password' as Href)} style={{ marginTop: 14, alignSelf: 'center' }}>
+        <Text style={{ fontFamily: font.semibold, fontSize: 13, color: t.textMuted }}>Forgot password?</Text>
+      </Pressable>
 
       <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 18 }}>
         <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted }}>New here?</Text>

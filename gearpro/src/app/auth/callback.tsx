@@ -17,15 +17,23 @@ export default function AuthCallback() {
       router.replace(href);
     };
 
-    // `detectSessionInUrl` on the client exchanges the ?code= param
-    // asynchronously — check immediately in case it already landed, then
-    // listen for the SIGNED_IN event the exchange fires when it completes.
+    // A password-reset link lands here carrying a recovery token (type=recovery
+    // in the URL). We must route those to the set-new-password screen, not into
+    // the app -- even though the token also produces a (temporary) session.
+    const isRecovery =
+      typeof window !== 'undefined' && /type=recovery/.test(window.location.hash + window.location.search);
+
+    // `detectSessionInUrl` on the client exchanges the token asynchronously —
+    // check immediately in case it already landed, then listen for the event
+    // the exchange fires when it completes.
+    const recoveryHref = '/reset-password' as Href;
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) go('/home');
+      if (data.session) go(isRecovery ? recoveryHref : '/home');
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) go('/home');
+      if (event === 'PASSWORD_RECOVERY') go(recoveryHref);
+      else if (event === 'SIGNED_IN' && session) go(isRecovery ? recoveryHref : '/home');
     });
 
     // Expired/invalid confirmation link — don't leave the user stuck on a spinner.
