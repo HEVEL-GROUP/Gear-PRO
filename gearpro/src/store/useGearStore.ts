@@ -245,6 +245,7 @@ type StoreState = {
   addGear: (item: Omit<GearItem, 'id'>) => void;
   updateGear: (id: string, patch: Partial<GearItem>) => void;
   removeGear: (id: string) => void;
+  removeGearBulk: (ids: string[]) => void;
   addTrip: (trip: Omit<Trip, 'id'>) => string;
   removeTrip: (id: string) => void;
   addAssignment: (tripId: string, bagId: string, gearId: string, quantity?: number) => void;
@@ -355,6 +356,21 @@ export const useGearStore = create<StoreState>()(
             assignments: t.assignments.filter((a) => a.gearId !== id),
           })),
         })),
+      // Bulk counterpart to removeGear: deletes every gear id in one atomic
+      // state update (so the sync subscriber fires a single push, not one per
+      // item) and cascades the same assignment cleanup. No-op on an empty list.
+      removeGearBulk: (ids) =>
+        set((s) => {
+          const doomed = new Set(ids);
+          if (doomed.size === 0) return s;
+          return {
+            gear: s.gear.filter((it) => !doomed.has(it.id)),
+            trips: s.trips.map((t) => ({
+              ...t,
+              assignments: t.assignments.filter((a) => !doomed.has(a.gearId)),
+            })),
+          };
+        }),
       addTrip: (trip) => {
         const id = uid();
         set((s) => ({ trips: [...s.trips, { ...trip, id }] }));

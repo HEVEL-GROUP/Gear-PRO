@@ -389,6 +389,31 @@ export default function TripDetail() {
             </Pressable>
           </View>
 
+          {iOwnTrip && !isSharedTrip ? (
+            <Pressable onPress={() => setShareOpen(true)} style={{ marginBottom: 16 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  backgroundColor: t.soft,
+                  borderRadius: 14,
+                  padding: 14,
+                }}>
+                <Ionicons name="person-add-outline" size={22} color={t.softText} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.softText }}>
+                    Pack this trip with friends
+                  </Text>
+                  <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 1 }}>
+                    Share a link — everyone packs their own gear and sees what the others bring.
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={t.softText} />
+              </View>
+            </Pressable>
+          ) : null}
+
           {trip.locationLat != null && trip.locationLon != null ? (
             <WeatherCard
               lat={trip.locationLat}

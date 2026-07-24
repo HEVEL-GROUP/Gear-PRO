@@ -126,6 +126,42 @@ describe('useGearStore', () => {
     });
   });
 
+  describe('removeGearBulk', () => {
+    it('removes every listed id and cascades to strip their assignments, leaving others', () => {
+      const tripId = useGearStore.getState().addTrip({
+        name: 'Trip',
+        location: '',
+        startDate: '',
+        endDate: '',
+        bags: [],
+        assignments: [],
+      });
+      useGearStore.getState().addBag(tripId, { label: 'Pack', maxWeightLb: 40, color: '#000' });
+      const bagId = useGearStore.getState().trips.find((t) => t.id === tripId)!.bags[0].id;
+      const a = addGearAndGetId({ brand: 'A', name: '1', category: 'Other', weightLb: 1, quantity: 1 });
+      const b = addGearAndGetId({ brand: 'B', name: '2', category: 'Other', weightLb: 1, quantity: 1 });
+      const c = addGearAndGetId({ brand: 'C', name: '3', category: 'Other', weightLb: 1, quantity: 1 });
+      useGearStore.getState().addAssignment(tripId, bagId, a);
+      useGearStore.getState().addAssignment(tripId, bagId, c);
+
+      useGearStore.getState().removeGearBulk([a, b]);
+
+      const { gear, trips } = useGearStore.getState();
+      expect(gear.some((g) => g.id === a)).toBe(false);
+      expect(gear.some((g) => g.id === b)).toBe(false);
+      expect(gear.some((g) => g.id === c)).toBe(true);
+      // The assignment for the removed item is stripped; the surviving one stays.
+      const assignments = trips.find((t) => t.id === tripId)!.assignments;
+      expect(assignments.map((x) => x.gearId)).toEqual([c]);
+    });
+
+    it('is a no-op on an empty id list', () => {
+      const before = useGearStore.getState().gear.length;
+      useGearStore.getState().removeGearBulk([]);
+      expect(useGearStore.getState().gear.length).toBe(before);
+    });
+  });
+
   describe('categories', () => {
     it('addCategory is a no-op for a case-insensitive duplicate of an existing category', () => {
       useGearStore.getState().addCategory('Shelter');

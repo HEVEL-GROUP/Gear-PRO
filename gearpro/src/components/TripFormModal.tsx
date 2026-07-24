@@ -98,9 +98,22 @@ export function TripFormModal({ visible, onClose, onCreated }: Props) {
         <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.alert, marginBottom: 10 }}>{error}</Text>
       ) : null}
       <Button label="Create trip" onPress={save} />
-      <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, textAlign: 'center', marginTop: 12 }}>
-        Starts with a My Pack bag — add gear next.
-      </Text>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          backgroundColor: t.soft,
+          borderRadius: 12,
+          paddingHorizontal: 12,
+          paddingVertical: 10,
+          marginTop: 12,
+        }}>
+        <Ionicons name="people-outline" size={16} color={t.softText} />
+        <Text style={{ flex: 1, fontFamily: font.medium, fontSize: 12, color: t.softText, lineHeight: 17 }}>
+          Starts with a My Pack bag. You can invite friends to pack this trip together anytime.
+        </Text>
+      </View>
 
       <CalendarSheet
         visible={calendarOpen}
