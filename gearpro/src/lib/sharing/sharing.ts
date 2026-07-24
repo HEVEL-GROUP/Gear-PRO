@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
-import { pullFromCloud, pushToCloud } from '@/lib/sync';
+import { ensureLocalOwnedBy, pullFromCloud, pushToCloud } from '@/lib/sync';
 import { useGearStore } from '@/store/useGearStore';
 
 // join/leave replace local state with a fresh pull. If there are unsynced local
@@ -40,7 +40,17 @@ export async function unshareTrip(tripId: string): Promise<void> {
 
 // Adds the caller as a member and returns the trip id. Pulls afterwards so the
 // newly-visible shared trip (and any teammate gear on it) lands in the store.
+//
+// /join/[token] is reachable WITHOUT ever mounting (protected)/_layout.tsx --
+// it's a sibling top-level route -- so this may be the very first thing that
+// touches local gear/trip data for this session, before useCloudSync's
+// syncOnLogin has run (or even started) for whoever just signed up or logged
+// in. ensureLocalOwnedBy is the same guard syncOnLogin calls first: if local
+// storage still belongs to a different, previously-signed-in user in this
+// browser, reset to empty before flushPendingPush/pullFromCloud can read or
+// upload any of it under the new user's identity.
 export async function joinTripByToken(token: string, userId: string): Promise<string> {
+  ensureLocalOwnedBy(userId);
   const { data, error } = await supabase.rpc('join_trip_by_token', { tok: token });
   if (error) throw error;
   await flushPendingPush(userId);

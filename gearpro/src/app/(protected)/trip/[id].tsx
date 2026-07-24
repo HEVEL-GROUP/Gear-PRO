@@ -6,6 +6,7 @@ import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { BagFormSheet } from '@/components/BagFormSheet';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { ShareTripSheet } from '@/components/ShareTripSheet';
+import { TripFormModal } from '@/components/TripFormModal';
 import { Button, Field, Sheet } from '@/components/form';
 import { Card, Chip, Display, Screen } from '@/components/ui';
 import { WeatherCard } from '@/components/WeatherCard';
@@ -111,6 +112,7 @@ export default function TripDetail() {
   const [reasonText, setReasonText] = useState('');
   const [moveFor, setMoveFor] = useState<string | null>(null);
   const [confirmDeleteTrip, setConfirmDeleteTrip] = useState(false);
+  const [editTripOpen, setEditTripOpen] = useState(false);
   const [bagEdit, setBagEdit] = useState<{ open: boolean; bagId: string | null }>({
     open: false,
     bagId: null,
@@ -364,9 +366,14 @@ export default function TripDetail() {
           <Ionicons name="people-outline" size={22} color={isSharedTrip ? t.primary : t.textMuted} />
         </Pressable>
         {iOwnTrip ? (
-          <Pressable onPress={() => setConfirmDeleteTrip(true)} hitSlop={12} style={{ marginLeft: 10 }}>
-            <Ionicons name="trash-outline" size={20} color={t.textMuted} />
-          </Pressable>
+          <>
+            <Pressable onPress={() => setEditTripOpen(true)} hitSlop={12} style={{ marginLeft: 10 }}>
+              <Ionicons name="create-outline" size={20} color={t.textMuted} />
+            </Pressable>
+            <Pressable onPress={() => setConfirmDeleteTrip(true)} hitSlop={12} style={{ marginLeft: 10 }}>
+              <Ionicons name="trash-outline" size={20} color={t.textMuted} />
+            </Pressable>
+          </>
         ) : null}
       </View>
 
@@ -783,6 +790,11 @@ export default function TripDetail() {
         tripId={trip.id}
         editBagId={bagEdit.bagId}
         onClose={() => setBagEdit({ open: false, bagId: null })}
+      />
+      <TripFormModal
+        visible={editTripOpen}
+        onClose={() => setEditTripOpen(false)}
+        editTripId={trip.id}
       />
       <ConfirmSheet
         visible={confirmDeleteTrip}

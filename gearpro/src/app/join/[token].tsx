@@ -34,16 +34,24 @@ export default function JoinScreen() {
         setTripId(id);
       } catch (e) {
         // A genuinely dead token surfaces the RPC's "invalid or expired link";
-        // anything else (offline/transient) is retryable, so don't mislabel a
-        // working link as turned off.
-        const msg = e instanceof Error ? e.message : '';
+        // anything else (offline/transient/a real bug) is retryable, so don't
+        // mislabel a working link as turned off. Always logged, and the raw
+        // message rides along in the UI too (not just devtools) -- otherwise
+        // an unexpected, non-transient failure looks IDENTICAL to "you're
+        // offline" and retry just fails the same way forever with no way to
+        // tell what's actually wrong.
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error('[join] failed to join trip', e);
         if (/invalid or expired/i.test(msg)) {
           setError({
             message: "This share link is invalid or has been turned off. Ask your trip's owner for a new one.",
             retryable: false,
           });
         } else {
-          setError({ message: "Couldn't reach the server. Check your connection and try again.", retryable: true });
+          setError({
+            message: `Couldn't finish joining this trip. Check your connection and try again.${msg ? `\n\n(${msg})` : ''}`,
+            retryable: true,
+          });
         }
       }
     })();
