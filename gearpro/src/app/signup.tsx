@@ -1,4 +1,4 @@
-import { Redirect, useRouter } from 'expo-router';
+import { type Href, Redirect, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -7,6 +7,7 @@ import { AuthDivider, GoogleSignInButton } from '@/components/GoogleSignInButton
 import { Mark } from '@/components/Mark';
 import { Display, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { peekPendingJoin, takePendingJoin } from '@/lib/sharing/pendingJoin';
 import { supabase } from '@/lib/supabase/client';
 import { font, useTheme } from '@/theme/tokens';
 
@@ -23,8 +24,11 @@ export default function SignupScreen() {
   const [error, setError] = useState('');
   const [checkEmail, setCheckEmail] = useState(false);
 
+  // Honor a pending share-link join (auto-confirm projects land here with a
+  // session immediately after signUp).
   if (!authLoading && session) {
-    return <Redirect href="/home" />;
+    const pending = takePendingJoin();
+    return <Redirect href={pending ? (`/join/${pending}` as Href) : '/home'} />;
   }
 
   const onSubmit = async () => {
@@ -39,9 +43,18 @@ export default function SignupScreen() {
       return;
     }
     setSubmitting(true);
+    // If a share link is mid-join, carry its token through the confirmation
+    // link (?join=) so clicking it -- even on another device -- finishes the
+    // join instead of landing on /home.
+    const pendingJoin = peekPendingJoin();
+    const emailRedirectTo =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/auth/callback${pendingJoin ? `?join=${encodeURIComponent(pendingJoin)}` : ''}`
+        : undefined;
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
+      options: emailRedirectTo ? { emailRedirectTo } : undefined,
     });
     setSubmitting(false);
     if (signUpError) {

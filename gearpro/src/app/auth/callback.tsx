@@ -2,6 +2,7 @@ import { type Href, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Text, View } from 'react-native';
 
+import { takePendingJoin } from '@/lib/sharing/pendingJoin';
 import { supabase } from '@/lib/supabase/client';
 import { font, useTheme } from '@/theme/tokens';
 
@@ -23,17 +24,29 @@ export default function AuthCallback() {
     const isRecovery =
       typeof window !== 'undefined' && /type=recovery/.test(window.location.hash + window.location.search);
 
+    // A share link that went through Google SSO / email confirmation lands here
+    // after a full page reload. Recover the join token from the callback URL
+    // (?join=, threaded through the OAuth/email redirect) or the persisted
+    // pendingJoin store, and finish the join instead of dropping the user on
+    // /home. URL param wins so a cross-device email confirmation still works.
+    const urlJoin =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('join')
+        : null;
+    const joinToken = urlJoin || takePendingJoin();
+    const postAuthHref: Href = joinToken ? (`/join/${joinToken}` as Href) : '/home';
+
     // `detectSessionInUrl` on the client exchanges the token asynchronously —
     // check immediately in case it already landed, then listen for the event
     // the exchange fires when it completes.
     const recoveryHref = '/reset-password' as Href;
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) go(isRecovery ? recoveryHref : '/home');
+      if (data.session) go(isRecovery ? recoveryHref : postAuthHref);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') go(recoveryHref);
-      else if (event === 'SIGNED_IN' && session) go(isRecovery ? recoveryHref : '/home');
+      else if (event === 'SIGNED_IN' && session) go(isRecovery ? recoveryHref : postAuthHref);
     });
 
     // Expired/invalid confirmation link — don't leave the user stuck on a spinner.

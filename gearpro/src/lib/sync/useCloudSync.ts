@@ -83,12 +83,24 @@ export function useCloudSync() {
         return;
       }
       pendingRemote.current = false;
-      applyingRemote.current = true;
-      pullFromCloud(userId)
-        .catch((err) => console.warn('[realtime] pull failed', err))
-        .finally(() => {
-          applyingRemote.current = false;
-        });
+      // applyingRemote is flipped by pullFromCloud ONLY around its synchronous
+      // setState (via markApplying), never across the network fetch -- so an
+      // edit made while the pull is in flight is still marked dirty by the
+      // subscriber, and skipApplyIf then aborts the apply so it isn't clobbered.
+      pullFromCloud(userId, {
+        skipApplyIf: () => useGearStore.getState().syncDirty,
+        markApplying: (v) => {
+          applyingRemote.current = v;
+        },
+      })
+        .then((applied) => {
+          if (!applied) {
+            // A local edit raced us; retry after its push lands.
+            pendingRemote.current = true;
+            scheduleRemotePull();
+          }
+        })
+        .catch((err) => console.warn('[realtime] pull failed', err));
     };
     const scheduleRemotePull = () => {
       if (remoteTimer.current) clearTimeout(remoteTimer.current);

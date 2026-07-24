@@ -20,8 +20,9 @@ export default function JoinScreen() {
   const router = useRouter();
   const { token } = useLocalSearchParams<{ token: string }>();
   const { session, isLoading } = useAuth();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
   const [tripId, setTripId] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const attempted = useRef(false);
 
   useEffect(() => {
@@ -31,11 +32,28 @@ export default function JoinScreen() {
       try {
         const id = await joinTripByToken(token, session.user.id);
         setTripId(id);
-      } catch {
-        setError("This share link is invalid or has been turned off. Ask your trip's owner for a new one.");
+      } catch (e) {
+        // A genuinely dead token surfaces the RPC's "invalid or expired link";
+        // anything else (offline/transient) is retryable, so don't mislabel a
+        // working link as turned off.
+        const msg = e instanceof Error ? e.message : '';
+        if (/invalid or expired/i.test(msg)) {
+          setError({
+            message: "This share link is invalid or has been turned off. Ask your trip's owner for a new one.",
+            retryable: false,
+          });
+        } else {
+          setError({ message: "Couldn't reach the server. Check your connection and try again.", retryable: true });
+        }
       }
     })();
-  }, [isLoading, session, token]);
+  }, [isLoading, session, token, retryKey]);
+
+  const retry = () => {
+    attempted.current = false;
+    setError(null);
+    setRetryKey((k) => k + 1);
+  };
 
   if (!isLoading && !session && token) {
     setPendingJoin(token);
@@ -60,10 +78,15 @@ export default function JoinScreen() {
                 textAlign: 'center',
                 maxWidth: 320,
               }}>
-              {error}
+              {error.message}
             </Text>
-            <View style={{ width: 200, marginTop: 8 }}>
-              <Button label="Go to my trips" onPress={() => router.replace('/home')} />
+            <View style={{ width: 200, marginTop: 8, gap: 8 }}>
+              {error.retryable ? <Button label="Try again" onPress={retry} /> : null}
+              <Button
+                label="Go to my trips"
+                tone={error.retryable ? 'ghost' : 'primary'}
+                onPress={() => router.replace('/home')}
+              />
             </View>
           </>
         ) : (

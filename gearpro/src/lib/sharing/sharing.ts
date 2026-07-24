@@ -1,5 +1,15 @@
 import { supabase } from '@/lib/supabase/client';
-import { pullFromCloud } from '@/lib/sync';
+import { pullFromCloud, pushToCloud } from '@/lib/sync';
+import { useGearStore } from '@/store/useGearStore';
+
+// join/leave replace local state with a fresh pull. If there are unsynced local
+// edits (syncDirty), push them to the cloud FIRST so the pull doesn't overwrite
+// and permanently drop them -- mirrors syncOnLogin's push-before-pull guarantee.
+async function flushPendingPush(userId: string): Promise<void> {
+  if (!useGearStore.getState().syncDirty) return;
+  await pushToCloud(userId);
+  useGearStore.getState().setSyncDirty(false);
+}
 
 export type TripMember = {
   memberId: string;
@@ -33,6 +43,7 @@ export async function unshareTrip(tripId: string): Promise<void> {
 export async function joinTripByToken(token: string, userId: string): Promise<string> {
   const { data, error } = await supabase.rpc('join_trip_by_token', { tok: token });
   if (error) throw error;
+  await flushPendingPush(userId);
   await pullFromCloud(userId);
   return data as string;
 }
@@ -41,6 +52,7 @@ export async function joinTripByToken(token: string, userId: string): Promise<st
 // this only ever deletes the caller's own membership. Pull afterwards so the
 // trip disappears locally (it's no longer visible once membership is gone).
 export async function leaveTrip(tripId: string, userId: string): Promise<void> {
+  await flushPendingPush(userId);
   const { error } = await supabase
     .from('trip_members')
     .delete()

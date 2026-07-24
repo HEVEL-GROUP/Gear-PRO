@@ -164,7 +164,11 @@ export default function TripDetail() {
   const target = bagTarget(trip);
   const today = todayStamp();
   const lifecycle = tripLifecycle(trip, today);
-  const packed = packedCount(trip);
+  // Scope the packed count (and the Return-trip action below) to the user's own
+  // gear -- on a shared trip a teammate's packed items are read-only and must
+  // not be counted or bulk-returned. On a solo trip every assignment is the
+  // user's own, so this equals the full count.
+  const packed = packedCount(trip, userId ?? undefined);
   const iOwnTrip = !trip.ownerId || trip.ownerId === userId;
   // A member may edit only their OWN bags on a shared trip -- RLS blocks
   // inserting an assignment onto a bag someone else owns. On any trip, your own
@@ -397,7 +401,7 @@ export default function TripDetail() {
           {mode === 'return' && packed > 0 ? (
             <Pressable
               onPress={() => {
-                returnTrip(trip.id);
+                returnTrip(trip.id, userId ?? undefined);
                 tapSuccess();
               }}
               style={{ marginBottom: 16 }}>

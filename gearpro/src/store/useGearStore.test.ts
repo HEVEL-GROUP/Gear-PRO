@@ -4,6 +4,8 @@ import {
   expiringGear,
   flaggedAssignments,
   groupByCategory,
+  packedCount,
+  Trip,
   tripLifecycle,
   useGearStore,
 } from './useGearStore';
@@ -222,6 +224,50 @@ describe('useGearStore', () => {
     });
   });
 
+  describe('returnTrip (shared-trip owner scoping)', () => {
+    const ME = 'me-user-id';
+    const MATE = 'teammate-user-id';
+    function setupSharedTrip() {
+      useGearStore.setState({
+        gear: [],
+        sharedGearById: {},
+        trips: [
+          {
+            id: 'trip1',
+            name: 'Shared',
+            location: '',
+            startDate: '',
+            endDate: '',
+            ownerId: ME,
+            bags: [
+              { id: 'bag-me', label: 'Mine', maxWeightLb: 40, color: '#000', ownerId: ME },
+              { id: 'bag-mate', label: 'Theirs', maxWeightLb: 40, color: '#111', ownerId: MATE },
+            ],
+            assignments: [
+              { id: 'a-me', gearId: 'g1', bagId: 'bag-me', quantity: 1, status: 'checked_out', ownerId: ME },
+              { id: 'a-mate', gearId: 'g2', bagId: 'bag-mate', quantity: 2, status: 'checked_out', ownerId: MATE },
+            ],
+          },
+        ],
+      });
+    }
+
+    it("returns only the caller's own checked-out gear, leaving a teammate's untouched", () => {
+      setupSharedTrip();
+      useGearStore.getState().returnTrip('trip1', ME);
+      const a = useGearStore.getState().trips[0].assignments;
+      expect(a.find((x) => x.id === 'a-me')!.status).toBe('returned');
+      expect(a.find((x) => x.id === 'a-mate')!.status).toBe('checked_out');
+    });
+
+    it('with no ownerId (solo trip) returns every checked-out assignment', () => {
+      setupSharedTrip();
+      useGearStore.getState().returnTrip('trip1');
+      const a = useGearStore.getState().trips[0].assignments;
+      expect(a.every((x) => x.status === 'returned')).toBe(true);
+    });
+  });
+
   describe('flaggedAssignments', () => {
     it('only surfaces needs_repair, consumed, and lost -- not reserved/checked_out/returned', () => {
       const tripId = useGearStore.getState().addTrip({
@@ -373,5 +419,30 @@ describe('syncDirty flag', () => {
     expect(useGearStore.getState().syncDirty).toBe(true);
     useGearStore.getState().resetLocal();
     expect(useGearStore.getState().syncDirty).toBe(false);
+  });
+});
+
+describe('packedCount (owner scoping)', () => {
+  const trip: Trip = {
+    id: 't',
+    name: 'Shared',
+    location: '',
+    startDate: '',
+    endDate: '',
+    bags: [],
+    assignments: [
+      { id: 'a-me', gearId: 'g1', bagId: 'b1', quantity: 1, status: 'checked_out', ownerId: 'me' },
+      { id: 'a-mate', gearId: 'g2', bagId: 'b2', quantity: 2, status: 'checked_out', ownerId: 'mate' },
+      { id: 'a-reserved', gearId: 'g3', bagId: 'b1', quantity: 5, status: 'reserved', ownerId: 'me' },
+    ],
+  };
+
+  it('counts all checked-out units without an ownerId', () => {
+    expect(packedCount(trip)).toBe(3); // 1 (me) + 2 (mate); reserved excluded
+  });
+
+  it("counts only the owner's checked-out units with an ownerId", () => {
+    expect(packedCount(trip, 'me')).toBe(1);
+    expect(packedCount(trip, 'mate')).toBe(2);
   });
 });

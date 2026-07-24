@@ -153,7 +153,19 @@ export async function pushToCloud(userId: string): Promise<void> {
  * (the library) while teammates' gear that's on a shared trip is kept separate
  * in `sharedGearById` so it never appears in the user's own Gear list.
  */
-export async function pullFromCloud(userId: string): Promise<void> {
+export async function pullFromCloud(
+  userId: string,
+  opts?: {
+    // Checked AFTER the network fetch, immediately before applying. Return true
+    // to abort the apply -- used by the realtime path to bail when a local edit
+    // landed mid-fetch, so a background pull never clobbers unsynced work.
+    skipApplyIf?: () => boolean;
+    // Called with true right before setState and false right after, so a caller
+    // can flag "this store change is a remote pull, not a user edit" for exactly
+    // the synchronous window of the write (not across the async fetch).
+    markApplying?: (v: boolean) => void;
+  },
+): Promise<boolean> {
   const [gearRes, tripsRes, bagsRes, assignmentsRes] = await Promise.all([
     supabase.from('gear_items').select('*'),
     supabase.from('trips').select('*'),
@@ -221,8 +233,18 @@ export async function pullFromCloud(userId: string): Promise<void> {
     shareToken: r.share_token ?? undefined,
   }));
 
+  // If a local edit landed while we were fetching, don't overwrite it -- the
+  // caller (realtime) will retry the pull after the edit is pushed.
+  if (opts?.skipApplyIf?.()) return false;
+
   // A pull makes local an exact copy of the cloud, so there is nothing unsynced.
+  // markApplying brackets ONLY this synchronous write, so the store subscriber
+  // ignores it as non-user-edit without also suppressing edits made during the
+  // (async) fetch above.
+  opts?.markApplying?.(true);
   useGearStore.setState({ gear, trips, sharedGearById, syncDirty: false });
+  opts?.markApplying?.(false);
+  return true;
 }
 
 async function pushLocal(userId: string): Promise<void> {

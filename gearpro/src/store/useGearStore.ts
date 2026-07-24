@@ -251,7 +251,10 @@ type StoreState = {
   updateAssignment: (tripId: string, assignmentId: string, patch: Partial<Assignment>) => void;
   removeAssignment: (tripId: string, assignmentId: string) => void;
   moveAssignment: (tripId: string, assignmentId: string, toBagId: string) => void;
-  returnTrip: (tripId: string) => void;
+  // ownerId scopes the bulk return to the caller's own assignments on a shared
+  // trip -- a teammate's gear is read-only and must not be flipped. Omit on a
+  // solo trip (every assignment is the user's own).
+  returnTrip: (tripId: string, ownerId?: string) => void;
   addBag: (tripId: string, bag: Omit<Bag, 'id'>) => void;
   updateBag: (tripId: string, bagId: string, patch: Partial<Bag>) => void;
   removeBag: (tripId: string, bagId: string) => void;
@@ -428,7 +431,7 @@ export const useGearStore = create<StoreState>()(
             };
           }),
         })),
-      returnTrip: (tripId) =>
+      returnTrip: (tripId, ownerId) =>
         set((s) => ({
           trips: s.trips.map((t) =>
             t.id !== tripId
@@ -436,7 +439,9 @@ export const useGearStore = create<StoreState>()(
               : {
                   ...t,
                   assignments: t.assignments.map((a) =>
-                    a.status === 'checked_out' ? { ...a, status: 'returned' as GearStatus } : a,
+                    a.status === 'checked_out' && (!ownerId || !a.ownerId || a.ownerId === ownerId)
+                      ? { ...a, status: 'returned' as GearStatus }
+                      : a,
                   ),
                 },
           ),
@@ -606,9 +611,11 @@ export function todayStamp(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// Counts units (matches itemCount's convention), not assignment rows.
-export function packedCount(trip: Trip): number {
+// Counts units (matches itemCount's convention), not assignment rows. Pass
+// ownerId to count only the caller's own packed units on a shared trip (used by
+// the Return-trip action, which may only return the caller's own gear).
+export function packedCount(trip: Trip, ownerId?: string): number {
   return trip.assignments
-    .filter((a) => a.status === 'checked_out')
+    .filter((a) => a.status === 'checked_out' && (!ownerId || !a.ownerId || a.ownerId === ownerId))
     .reduce((sum, a) => sum + a.quantity, 0);
 }
