@@ -335,21 +335,25 @@ export const useGearStore = create<StoreState>()(
               })),
           };
         }),
-      // Reseeds this device back to factory-fresh state -- run on sign-out (and
-      // before account deletion) so a second account signing in on the same
-      // device never has the first account's local cache treated as "this
-      // device's data" by syncOnLogin's first-sync remap-and-upload path.
+      // Clears this device back to a signed-out EMPTY state -- run on sign-out
+      // (and before account deletion) so a second account signing in on the same
+      // device never inherits the first account's local cache. It resets to
+      // empty, NOT the demo seed: the demo is first-run onboarding content (it
+      // comes from the store's initial state on a fresh install) and must never
+      // be re-planted on logout. Re-seeding demo here caused it to keep coming
+      // back -- after "Clear demo data" emptied the cloud, logout re-seeded demo
+      // locally and the next login (seeing an empty cloud) re-uploaded it.
       //
       // Wrapped in the localResetInProgress flag: zustand notifies subscribers
       // synchronously inside set(), so the cloud-sync subscriber sees the flag
-      // and skips marking the store dirty. Without this, the reseed looked like
-      // a user edit and the next login pushed the demo seed over real cloud data.
+      // and skips marking the store dirty. Without this, the reset looked like a
+      // user edit and the next login pushed local over real cloud data.
       resetLocal: () => {
         localResetInProgress = true;
         try {
           set({
-            gear: seedGear,
-            trips: seedTrips(),
+            gear: [],
+            trips: [],
             categories: CATEGORIES,
             customCategories: [],
             syncDirty: false,

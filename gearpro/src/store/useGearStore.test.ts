@@ -24,26 +24,57 @@ describe('useGearStore', () => {
     useGearStore.getState().resetLocal();
   });
 
-  describe('resetLocal (factory-fresh seed)', () => {
-    it('reseeds all gear and trips flagged as demo data', () => {
-      const { gear, trips } = useGearStore.getState();
-      expect(gear.length).toBeGreaterThan(0);
-      expect(gear.every((g) => g.isDemo)).toBe(true);
-      expect(trips.length).toBeGreaterThan(0);
-      expect(trips.every((t) => t.isDemo)).toBe(true);
+  describe('resetLocal (sign-out reset)', () => {
+    it('clears gear and trips to empty -- demo is NOT re-seeded on logout', () => {
+      // Put real data in, then reset as sign-out would.
+      useGearStore.getState().addGear({ brand: 'B', name: 'N', category: 'Other', weightLb: 1, quantity: 1 });
+      useGearStore.getState().addTrip({
+        name: 'T', location: '', startDate: '', endDate: '', bags: [], assignments: [],
+      });
+
+      useGearStore.getState().resetLocal();
+
+      const { gear, trips, syncDirty } = useGearStore.getState();
+      expect(gear).toHaveLength(0);
+      expect(trips).toHaveLength(0);
+      expect(syncDirty).toBe(false);
     });
   });
 
   describe('clearDemoData', () => {
+    // resetLocal no longer seeds demo data, so these tests inject their own
+    // isDemo rows to exercise the clear-demo path.
+    const seedDemo = () =>
+      useGearStore.setState({
+        gear: [
+          {
+            id: '11111111-0000-0000-0000-000000000001',
+            brand: 'Demo',
+            name: 'Tent',
+            category: 'Shelter',
+            weightLb: 5,
+            quantity: 1,
+            isDemo: true,
+          },
+        ],
+        trips: [
+          {
+            id: '22222222-0000-0000-0000-000000000001',
+            name: 'Demo trip',
+            location: '',
+            startDate: '',
+            endDate: '',
+            bags: [],
+            assignments: [],
+            isDemo: true,
+          },
+        ],
+      });
+
     it('removes only isDemo-flagged gear/trips, even when ids are UUIDs (post-sync regression)', () => {
-      // Simulate what syncOnLogin's remapToUuids does: every id becomes a
-      // UUID, but isDemo must still be honored -- this is the exact bug that
-      // was found and fixed (detecting demo data by id shape broke after the
-      // first cloud sync remapped every id).
-      useGearStore.setState((s) => ({
-        gear: s.gear.map((g, i) => ({ ...g, id: `11111111-0000-0000-0000-00000000000${i}` })),
-        trips: s.trips.map((t, i) => ({ ...t, id: `22222222-0000-0000-0000-00000000000${i}` })),
-      }));
+      // isDemo must be honored regardless of id shape -- detecting demo data by
+      // id shape broke after the first cloud sync remapped every id to a UUID.
+      seedDemo();
 
       addGearAndGetId({
         brand: 'Real',
@@ -66,11 +97,14 @@ describe('useGearStore', () => {
       const { gear, trips } = useGearStore.getState();
       expect(gear.every((g) => !g.isDemo)).toBe(true);
       expect(gear.some((g) => g.name === 'Item')).toBe(true);
+      expect(gear.some((g) => g.name === 'Tent')).toBe(false); // demo removed
       expect(trips.every((t) => !t.isDemo)).toBe(true);
       expect(trips.some((t) => t.id === realTripId)).toBe(true);
     });
 
     it('strips assignments in surviving trips that pointed at removed demo gear', () => {
+      seedDemo();
+      const demoGearId = useGearStore.getState().gear[0].id; // the seeded isDemo gear
       const tripId = useGearStore.getState().addTrip({
         name: 'Mixed trip',
         location: '',
@@ -81,7 +115,6 @@ describe('useGearStore', () => {
       });
       useGearStore.getState().addBag(tripId, { label: 'Pack', maxWeightLb: 40, color: '#000' });
       const bagId = useGearStore.getState().trips.find((t) => t.id === tripId)!.bags[0].id;
-      const demoGearId = useGearStore.getState().gear[0].id; // seed gear is isDemo: true
 
       useGearStore.getState().addAssignment(tripId, bagId, demoGearId);
       expect(
