@@ -16,13 +16,19 @@ if (!supabaseOrigin) {
   throw new Error('EXPO_PUBLIC_SUPABASE_URL must be set when running inject-security-headers.js');
 }
 
+// Supabase Realtime (live shared-trip updates) opens a WebSocket to the same
+// host over wss://. A connect-src source with an https: scheme does NOT cover
+// wss: in browsers (verified: Chromium blocks it), so the WebSocket origin must
+// be listed explicitly or realtime is silently blocked in production.
+const supabaseWsOrigin = supabaseOrigin.replace(/^http/, 'ws');
+
 const csp = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  `connect-src 'self' blob: ${supabaseOrigin} https://nominatim.openstreetmap.org https://api.weather.gov`,
+  `connect-src 'self' blob: ${supabaseOrigin} ${supabaseWsOrigin} https://nominatim.openstreetmap.org https://api.weather.gov`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
