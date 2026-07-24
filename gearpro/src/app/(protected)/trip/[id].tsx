@@ -1,15 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 
 import { BagFormSheet } from '@/components/BagFormSheet';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
+import { ShareTripSheet } from '@/components/ShareTripSheet';
 import { Button, Field, Sheet } from '@/components/form';
 import { Card, Chip, Display, Screen } from '@/components/ui';
 import { WeatherCard } from '@/components/WeatherCard';
 import { WeightRing } from '@/components/WeightRing';
+import { useAuth } from '@/lib/auth/AuthProvider';
 import { tapLight, tapSuccess } from '@/lib/haptics';
+import { useProfile } from '@/lib/profile/useProfile';
+import { tripMemberNames } from '@/lib/sharing/sharing';
 import { font, useTheme } from '@/theme/tokens';
 import {
   Assignment,
@@ -75,6 +79,7 @@ export default function TripDetail() {
 
   const trips = useGearStore((s) => s.trips);
   const gear = useGearStore((s) => s.gear);
+  const sharedGearById = useGearStore((s) => s.sharedGearById);
   const addAssignment = useGearStore((s) => s.addAssignment);
   const updateAssignment = useGearStore((s) => s.updateAssignment);
   const removeAssignment = useGearStore((s) => s.removeAssignment);
@@ -82,7 +87,17 @@ export default function TripDetail() {
   const returnTrip = useGearStore((s) => s.returnTrip);
   const removeTrip = useGearStore((s) => s.removeTrip);
 
-  const byId = useMemo(() => gearMap(gear), [gear]);
+  const { session } = useAuth();
+  const userId = session?.user.id ?? null;
+  const { displayName } = useProfile();
+
+  // Teammate gear on a shared trip lives in sharedGearById (out of the user's
+  // own library), so fold it in here -- otherwise a teammate's assignments
+  // would render as "Unknown".
+  const byId = useMemo(
+    () => gearMap([...gear, ...Object.values(sharedGearById)]),
+    [gear, sharedGearById],
+  );
   const trip = trips.find((tr) => tr.id === id);
 
   const [assignBagId, setAssignBagId] = useState<string | null>(null);
@@ -104,6 +119,33 @@ export default function TripDetail() {
   // you open a trip, since the right answer depends on where you are in the
   // trip (deciding what goes, actively packing, or checking gear back in).
   const [mode, setMode] = useState<Mode | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  // userId -> display name, for labelling each bag with whose it is on a shared
+  // trip. Fetched only when the trip is actually shared.
+  const [memberNames, setMemberNames] = useState<Record<string, string>>({});
+
+  const isSharedTrip = !!trip?.shared || !!trip?.shareToken;
+  const tripId = trip?.id;
+  useEffect(() => {
+    if (!tripId || !isSharedTrip) {
+      setMemberNames({});
+      return;
+    }
+    let cancelled = false;
+    tripMemberNames(tripId)
+      .then((members) => {
+        if (cancelled) return;
+        const map: Record<string, string> = {};
+        for (const m of members) map[m.memberId] = m.displayName?.trim() || 'Teammate';
+        setMemberNames(map);
+      })
+      .catch(() => {
+        /* roster is non-critical for rendering */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tripId, isSharedTrip]);
 
   if (!trip) {
     return (
@@ -123,6 +165,14 @@ export default function TripDetail() {
   const today = todayStamp();
   const lifecycle = tripLifecycle(trip, today);
   const packed = packedCount(trip);
+  const iOwnTrip = !trip.ownerId || trip.ownerId === userId;
+  // A member may edit only their OWN bags on a shared trip -- RLS blocks
+  // inserting an assignment onto a bag someone else owns. On any trip, your own
+  // bags are editable and a teammate's are read-only.
+  const canEditBag = (bag: (typeof trip.bags)[number]) => !bag.ownerId || bag.ownerId === userId;
+  const meLabel = displayName?.trim() || 'You';
+  const bagOwnerLabel = (bag: (typeof trip.bags)[number]) =>
+    !bag.ownerId || bag.ownerId === userId ? meLabel : memberNames[bag.ownerId] ?? 'Teammate';
   const statusForAssignment = trip.assignments.find((a) => a.id === statusFor);
   const closeStatusSheet = () => {
     setStatusFor(null);
@@ -249,6 +299,25 @@ export default function TripDetail() {
     );
   };
 
+  // A teammate's bag on a shared trip: show what they're bringing, but with no
+  // controls -- RLS won't let you touch their gear, so nothing here is tappable.
+  const renderReadonlyRow = (a: (typeof trip.assignments)[number]) => {
+    const item = byId[a.gearId];
+    return (
+      <Card key={a.id} style={{ padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.text }}>
+            {item ? `${item.brand} ${item.name}` : 'Unknown'}
+          </Text>
+          <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
+            {((item?.weightLb ?? 0) * a.quantity).toFixed(2)} lb{a.quantity > 1 ? ` · ×${a.quantity}` : ''}
+          </Text>
+        </View>
+        <Chip label={STATUS_LABELS[a.status]} tone={statusTone(a.status)} />
+      </Card>
+    );
+  };
+
   // Groups any assignment list (plan/pack/return) by the gear's category, in
   // packing-list order, so a bag reads as sections instead of one long list.
   const renderCategoryGroups = (
@@ -271,18 +340,30 @@ export default function TripDetail() {
           <Ionicons name="chevron-back" size={26} color={t.text} />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <Display style={{ fontSize: 22 }}>{trip.name}</Display>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Display style={{ fontSize: 22 }}>{trip.name}</Display>
+            {isSharedTrip ? (
+              <Chip
+                label="Shared"
+                tone="sage"
+                icon={<Ionicons name="people" size={12} color={t.softText} />}
+              />
+            ) : null}
+          </View>
           <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 1 }}>
+            {trip.shared ? `Shared by ${trip.ownerId ? memberNames[trip.ownerId] ?? 'a friend' : 'a friend'} · ` : ''}
             {trip.location || 'No location'}
           </Text>
         </View>
         <Chip label={LIFECYCLE_META[lifecycle].label} tone={LIFECYCLE_META[lifecycle].tone} />
-        <Pressable
-          onPress={() => setConfirmDeleteTrip(true)}
-          hitSlop={12}
-          style={{ marginLeft: 10 }}>
-          <Ionicons name="trash-outline" size={20} color={t.textMuted} />
+        <Pressable onPress={() => setShareOpen(true)} hitSlop={12} style={{ marginLeft: 10 }}>
+          <Ionicons name="people-outline" size={22} color={isSharedTrip ? t.primary : t.textMuted} />
         </Pressable>
+        {iOwnTrip ? (
+          <Pressable onPress={() => setConfirmDeleteTrip(true)} hitSlop={12} style={{ marginLeft: 10 }}>
+            <Ionicons name="trash-outline" size={20} color={t.textMuted} />
+          </Pressable>
+        ) : null}
       </View>
 
       {mode === null ? (
@@ -412,13 +493,23 @@ export default function TripDetail() {
             const packedItems = items.filter((a) => a.status === 'checked_out');
             const bagW = bagWeight(bag.id);
             const over = bagW > bag.maxWeightLb;
+            const editable = canEditBag(bag);
             return (
               <View key={bag.id} style={{ marginBottom: 18 }}>
                 <Pressable
-                  onPress={() => setBagEdit({ open: true, bagId: bag.id })}
+                  onPress={() => editable && setBagEdit({ open: true, bagId: bag.id })}
+                  disabled={!editable}
                   style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                   <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: bag.color, marginRight: 8 }} />
-                  <Text style={{ fontFamily: font.bold, fontSize: 16, color: t.text, flex: 1 }}>{bag.label}</Text>
+                  <Text style={{ fontFamily: font.bold, fontSize: 16, color: t.text }} numberOfLines={1}>
+                    {bag.label}
+                  </Text>
+                  {isSharedTrip ? (
+                    <View style={{ marginLeft: 8 }}>
+                      <Chip label={bagOwnerLabel(bag)} tone={editable ? 'solid' : 'neutral'} />
+                    </View>
+                  ) : null}
+                  <View style={{ flex: 1 }} />
                   <Text
                     style={{
                       fontFamily: font.semibold,
@@ -428,7 +519,7 @@ export default function TripDetail() {
                     }}>
                     {bagW.toFixed(1)} / {bag.maxWeightLb} lb
                   </Text>
-                  <Ionicons name="ellipsis-horizontal" size={18} color={t.textMuted} />
+                  {editable ? <Ionicons name="ellipsis-horizontal" size={18} color={t.textMuted} /> : null}
                 </Pressable>
 
                 <View
@@ -452,8 +543,10 @@ export default function TripDetail() {
                 {items.length === 0 ? (
                   <Text
                     style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginBottom: 8, paddingLeft: 2 }}>
-                    Nothing planned for this bag yet.
+                    {editable ? 'Nothing planned for this bag yet.' : 'Nothing in this bag yet.'}
                   </Text>
+                ) : !editable ? (
+                  renderCategoryGroups(items, renderReadonlyRow)
                 ) : mode === 'plan' ? (
                   renderCategoryGroups(items, renderPlanRow)
                 ) : mode === 'pack' ? (
@@ -468,7 +561,7 @@ export default function TripDetail() {
                   <SuccessRow label="Nothing from this bag needs to come back." />
                 )}
 
-                {mode === 'plan' ? (
+                {editable && mode === 'plan' ? (
                   <Pressable onPress={() => setAssignBagId(bag.id)}>
                     <View
                       style={{
@@ -665,7 +758,11 @@ export default function TripDetail() {
       <ConfirmSheet
         visible={confirmDeleteTrip}
         title="Delete trip?"
-        message={`Delete "${trip.name}" and its packing list? Your gear stays in your library — only this trip is removed. This can't be undone.`}
+        message={
+          isSharedTrip
+            ? `Delete "${trip.name}"? This is a shared trip — deleting it removes it for everyone you shared with and turns off the link. Each person's own gear stays in their library. This can't be undone.`
+            : `Delete "${trip.name}" and its packing list? Your gear stays in your library — only this trip is removed. This can't be undone.`
+        }
         confirmLabel="Delete trip"
         onConfirm={() => {
           removeTrip(trip.id);
@@ -673,6 +770,15 @@ export default function TripDetail() {
         }}
         onClose={() => setConfirmDeleteTrip(false)}
       />
+      {userId ? (
+        <ShareTripSheet
+          visible={shareOpen}
+          onClose={() => setShareOpen(false)}
+          trip={trip}
+          userId={userId}
+          onLeft={() => router.replace('/home')}
+        />
+      ) : null}
     </Screen>
   );
 }

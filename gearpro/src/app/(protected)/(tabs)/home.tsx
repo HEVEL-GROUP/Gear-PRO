@@ -7,6 +7,8 @@ import { Mark } from '@/components/Mark';
 import { FeaturedCard } from '@/components/TripCard';
 import { TripFormModal } from '@/components/TripFormModal';
 import { Card, Chip, Display, Screen, Touchable } from '@/components/ui';
+import { useAuth } from '@/lib/auth/AuthProvider';
+import { useProfile } from '@/lib/profile/useProfile';
 import { font, useTheme } from '@/theme/tokens';
 import {
   bagTarget,
@@ -30,6 +32,18 @@ const fmtRange = (a: string, b: string) => {
   return `${d(a)} – ${d(b)}`;
 };
 
+const isTripShared = (trip: Trip) => !!trip.shared || !!trip.shareToken;
+
+// Two-letter avatar from a name ("Austin Norville" -> "AN") or, failing that,
+// the email local part ("anorville@..." -> "AN").
+function initialsFrom(nameOrEmail: string): string {
+  const base = nameOrEmail.replace(/@.*/, '').trim();
+  if (!base) return '?';
+  const parts = base.split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return base.slice(0, 2).toUpperCase();
+}
+
 const LIFECYCLE_META: Record<TripLifecycle, { label: string; tone: 'alert' | 'solid' | 'sage' | 'neutral' }> = {
   needs_return: { label: 'Needs return', tone: 'alert' },
   active: { label: 'Active', tone: 'solid' },
@@ -49,8 +63,18 @@ export default function TripsScreen() {
   const isWide = width >= 880;
   const gear = useGearStore((s) => s.gear);
   const trips = useGearStore((s) => s.trips);
-  const byId = useMemo(() => gearMap(gear), [gear]);
+  const sharedGearById = useGearStore((s) => s.sharedGearById);
+  // Fold teammate gear in so a shared trip's weight/breakdown matches its detail
+  // view (otherwise the card counts only your own gear against both bags' total
+  // capacity, e.g. "0.9 of 85 lb").
+  const byId = useMemo(
+    () => gearMap([...gear, ...Object.values(sharedGearById)]),
+    [gear, sharedGearById],
+  );
   const [tripModal, setTripModal] = useState(false);
+  const { session } = useAuth();
+  const { displayName } = useProfile();
+  const initials = initialsFrom(displayName?.trim() || session?.user.email || '?');
 
   const today = todayStamp();
   // Surface a trip that needs return first — that's the one that actually needs attention.
@@ -83,7 +107,7 @@ export default function TripsScreen() {
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-          <Text style={{ fontFamily: font.bold, color: t.onPrimary, fontSize: 13 }}>AN</Text>
+          <Text style={{ fontFamily: font.bold, color: t.onPrimary, fontSize: 13 }}>{initials}</Text>
         </View>
       </View>
 
@@ -100,6 +124,7 @@ export default function TripsScreen() {
             breakdown={categoryBreakdown(featured, byId).slice(0, 3)}
             barColors={barColors}
             lifecycle={featuredLifecycle}
+            shared={isTripShared(featured)}
           />
         </Touchable>
       ) : null}
@@ -126,8 +151,11 @@ export default function TripsScreen() {
               <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
                 {trip.location} · {fmtRange(trip.startDate, trip.endDate)}
               </Text>
-              <View style={{ marginTop: 6, alignSelf: 'flex-start' }}>
+              <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
                 <LifecycleChip trip={trip} today={today} />
+                {isTripShared(trip) ? (
+                  <Chip label="Shared" tone="sage" icon={<Ionicons name="people" size={12} color={t.softText} />} />
+                ) : null}
               </View>
             </View>
             <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.primary }}>

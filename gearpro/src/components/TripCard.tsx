@@ -24,6 +24,7 @@ export function FeaturedCard(props: {
   breakdown: { category: string; weight: number }[];
   barColors: string[];
   lifecycle: TripLifecycle;
+  shared?: boolean;
 }) {
   const t = useTheme();
   const maxCat = Math.max(...props.breakdown.map((b) => b.weight), 1);
@@ -60,6 +61,9 @@ export function FeaturedCard(props: {
       </View>
 
       <View style={{ flexDirection: 'row', gap: 7, marginTop: 16, flexWrap: 'wrap' }}>
+        {props.shared ? (
+          <Chip label="Shared" tone="sage" icon={<Ionicons name="people" size={13} color={t.softText} />} />
+        ) : null}
         <Chip label={`${props.bags} bags`} tone="sage" icon={<Ionicons name="briefcase-outline" size={13} color={t.softText} />} />
         <Chip label={`${props.items} items`} tone="sage" />
         {props.lifecycle === 'needs_return' ? (

@@ -45,6 +45,7 @@ export default function RootLayout() {
           <Stack.Screen name="reset-password" />
           <Stack.Screen name="subscribe" />
           <Stack.Screen name="auth/callback" />
+          <Stack.Screen name="join/[token]" />
           <Stack.Screen name="(protected)" />
         </Stack>
       </AuthProvider>

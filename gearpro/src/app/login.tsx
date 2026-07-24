@@ -7,6 +7,7 @@ import { AuthDivider, GoogleSignInButton } from '@/components/GoogleSignInButton
 import { Mark } from '@/components/Mark';
 import { Display, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { takePendingJoin } from '@/lib/sharing/pendingJoin';
 import { supabase } from '@/lib/supabase/client';
 import { font, useTheme } from '@/theme/tokens';
 
@@ -20,8 +21,13 @@ export default function LoginScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // Single post-auth routing point: fires the moment the session becomes real
+  // (email/password OR Google), and forwards to a pending share-link join if
+  // one is waiting. onSubmit deliberately doesn't navigate itself, so there's
+  // no race between two redirects.
   if (!authLoading && session) {
-    return <Redirect href="/home" />;
+    const pending = takePendingJoin();
+    return <Redirect href={pending ? (`/join/${pending}` as Href) : '/home'} />;
   }
 
   const onSubmit = async () => {
@@ -45,7 +51,8 @@ export default function LoginScreen() {
       );
       return;
     }
-    router.replace('/home');
+    // No navigation here -- the reactive Redirect above takes over once the
+    // session propagates, so a pending join link is honored consistently.
   };
 
   return (

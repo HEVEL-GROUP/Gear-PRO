@@ -218,6 +218,7 @@ export async function pullFromCloud(userId: string): Promise<void> {
     isDemo: r.is_demo ?? false,
     ownerId: r.user_id,
     shared: r.user_id !== userId,
+    shareToken: r.share_token ?? undefined,
   }));
 
   // A pull makes local an exact copy of the cloud, so there is nothing unsynced.

@@ -61,6 +61,11 @@ export type Trip = {
   // (someone else's). Owner-only fields; absent on locally-created trips.
   ownerId?: string;
   shared?: boolean;
+  // The trip's join secret, present only once it's been shared. Set exclusively
+  // by the share_trip/unshare_trip RPCs (never by a plain trip upsert), so the
+  // sync layer reads it but never writes it. A trip counts as "shared" in the
+  // UI when this is set (I'm the owner sharing) OR `shared` is true (I joined).
+  shareToken?: string;
 };
 
 export const STATUS_LABELS: Record<GearStatus, string> = {
