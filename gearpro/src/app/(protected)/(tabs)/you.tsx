@@ -14,6 +14,7 @@ import { tapLight } from '@/lib/haptics';
 import { useProfile } from '@/lib/profile/useProfile';
 import { openBillingPortal } from '@/lib/stripe/checkout';
 import { usePro } from '@/lib/stripe/usePro';
+import { pushToCloud } from '@/lib/sync';
 import { demoDataCounts, useGearStore } from '@/store/useGearStore';
 import { font, useTheme } from '@/theme/tokens';
 
@@ -65,6 +66,8 @@ export default function YouScreen() {
   const [exportError, setExportError] = useState<string | null>(null);
   const [demoSheetOpen, setDemoSheetOpen] = useState(false);
   const [deleteSheetOpen, setDeleteSheetOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
 
   const isTrial = planType === 'trial';
   // Only a real Stripe subscription has a billing-portal session to open --
@@ -263,8 +266,29 @@ export default function YouScreen() {
       <View style={{ height: 16 }} />
 
       <Pressable
+        disabled={loggingOut}
         onPress={async () => {
           tapLight();
+          setLogoutError(null);
+          setLoggingOut(true);
+          try {
+            // Flush any unsynced work to the cloud BEFORE wiping local to the
+            // demo seed -- otherwise recent edits (or, in the worst case, the
+            // whole account) can be lost on the next login. Must run while still
+            // authenticated; after signOut the token is gone and the write fails.
+            const uid = session?.user.id;
+            if (uid && useGearStore.getState().syncDirty) {
+              await pushToCloud(uid);
+              useGearStore.getState().setSyncDirty(false);
+            }
+          } catch {
+            // Couldn't reach the cloud. Do NOT sign out / reset -- that would
+            // discard unsynced work with no cloud copy. Stay signed in so the
+            // data is safe and can sync once back online.
+            setLoggingOut(false);
+            setLogoutError("Couldn't sync your latest changes. Check your connection and try again — your data is safe.");
+            return;
+          }
           await signOut();
           resetLocal();
           router.replace('/');
@@ -275,10 +299,18 @@ export default function YouScreen() {
             paddingVertical: 14,
             borderRadius: 14,
             backgroundColor: t.alertSoft,
+            opacity: loggingOut ? 0.6 : 1,
           }}>
-          <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.alertText }}>Log out</Text>
+          <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.alertText }}>
+            {loggingOut ? 'Saving & logging out…' : 'Log out'}
+          </Text>
         </View>
       </Pressable>
+      {logoutError ? (
+        <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.alert, textAlign: 'center', marginTop: 10 }}>
+          {logoutError}
+        </Text>
+      ) : null}
 
       <Pressable onPress={() => setDeleteSheetOpen(true)} style={{ marginTop: 20, alignSelf: 'center' }}>
         <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted }}>Delete account</Text>

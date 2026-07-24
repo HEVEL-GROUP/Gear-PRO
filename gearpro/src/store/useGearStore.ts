@@ -261,6 +261,14 @@ type StoreState = {
   removeBag: (tripId: string, bagId: string) => void;
 };
 
+// True only for the synchronous window of a sign-out reset. The cloud-sync
+// subscriber checks this and ignores the reseed, so wiping local back to the
+// demo seed on logout is NEVER treated as a user edit -- which previously
+// marked the store dirty and made the next login push the demo seed over the
+// user's real cloud data, destroying their account. See isLocalResetInProgress.
+let localResetInProgress = false;
+export const isLocalResetInProgress = () => localResetInProgress;
+
 export const useGearStore = create<StoreState>()(
   persist(
     (set) => ({
@@ -331,15 +339,26 @@ export const useGearStore = create<StoreState>()(
       // before account deletion) so a second account signing in on the same
       // device never has the first account's local cache treated as "this
       // device's data" by syncOnLogin's first-sync remap-and-upload path.
-      resetLocal: () =>
-        set({
-          gear: seedGear,
-          trips: seedTrips(),
-          categories: CATEGORIES,
-          customCategories: [],
-          syncDirty: false,
-          sharedGearById: {},
-        }),
+      //
+      // Wrapped in the localResetInProgress flag: zustand notifies subscribers
+      // synchronously inside set(), so the cloud-sync subscriber sees the flag
+      // and skips marking the store dirty. Without this, the reseed looked like
+      // a user edit and the next login pushed the demo seed over real cloud data.
+      resetLocal: () => {
+        localResetInProgress = true;
+        try {
+          set({
+            gear: seedGear,
+            trips: seedTrips(),
+            categories: CATEGORIES,
+            customCategories: [],
+            syncDirty: false,
+            sharedGearById: {},
+          });
+        } finally {
+          localResetInProgress = false;
+        }
+      },
       addGear: (item) => set((s) => ({ gear: [...s.gear, { ...item, id: uid() }] })),
       updateGear: (id, patch) =>
         set((s) => ({ gear: s.gear.map((it) => (it.id === id ? { ...it, ...patch } : it)) })),

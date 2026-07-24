@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { supabase } from '@/lib/supabase/client';
-import { useGearStore } from '@/store/useGearStore';
+import { isLocalResetInProgress, useGearStore } from '@/store/useGearStore';
 
 import { pullFromCloud, pushToCloud, syncOnLogin } from './index';
 
@@ -165,6 +165,10 @@ export function useCloudSync() {
           // This change came from a remote pull, not a user edit -- don't treat
           // it as dirty (which would push it straight back and loop).
           if (applyingRemote.current) return;
+          // This change is a sign-out reset to the demo seed, not a user edit.
+          // Marking it dirty would make the next login push the demo seed over
+          // the user's real cloud data (an account wipe).
+          if (isLocalResetInProgress()) return;
           // Bump the edit epoch so a push already in flight knows fresh work
           // landed and won't clear syncDirty (which would expose this edit to a
           // clobbering echo pull).

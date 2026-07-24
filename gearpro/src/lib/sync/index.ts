@@ -280,11 +280,26 @@ export async function syncOnLogin(userId: string): Promise<void> {
   if (tripsRes.error) throw tripsRes.error;
 
   const cloudHasData = (gearRes.count ?? 0) > 0 || (tripsRes.count ?? 0) > 0;
-  const localDirty = useGearStore.getState().syncDirty;
+  const local = useGearStore.getState();
+  const localDirty = local.syncDirty;
+  // Does local hold anything the user actually created (not just the shipped
+  // demo seed)? A sign-out reset leaves ONLY seed data. Pushing seed-only local
+  // over a cloud that already has the user's data would delete it -- so when the
+  // cloud has data, seed-only local is never allowed to win, even if a stray
+  // dirty flag survived a reset. This is the backstop that keeps a logout from
+  // ever wiping an account.
+  const localHasRealData =
+    local.gear.some((g) => !g.isDemo) || local.trips.some((t) => !t.isDemo);
 
-  if (!cloudHasData || localDirty) {
+  if (!cloudHasData) {
+    // First sync ever for this account -> seed the cloud from local.
+    await pushLocal(userId);
+  } else if (localDirty && localHasRealData) {
+    // Genuine unsynced edits (e.g. made offline) -> push them, don't clobber.
     await pushLocal(userId);
   } else {
+    // Cloud is authoritative -> pull. Covers a fresh device AND a post-logout
+    // seed-only local that must never overwrite real cloud data.
     await pullFromCloud(userId);
   }
 }
