@@ -47,6 +47,14 @@ export function useCloudSync() {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const applyingRemote = useRef(false);
   const pendingRemote = useRef(false);
+  // Guards against two pushes overlapping (pushToCloud snapshots state then
+  // does a full delete-missing, so concurrent pushes can delete each other's
+  // rows). editEpoch bumps on every real local edit; a push clears syncDirty
+  // only if the epoch is unchanged across its in-flight window -- otherwise an
+  // edit that landed mid-push would have its dirty flag wrongly cleared, and a
+  // realtime echo pull would then clobber it.
+  const pushInFlight = useRef(false);
+  const editEpoch = useRef(0);
 
   useEffect(() => {
     const clearTimers = () => {
@@ -57,6 +65,7 @@ export function useCloudSync() {
     };
     const teardown = () => {
       clearTimers();
+      pushInFlight.current = false;
       storeUnsub.current?.();
       storeUnsub.current = null;
       if (channelRef.current) {
@@ -110,13 +119,31 @@ export function useCloudSync() {
     const push = () => {
       if (pushTimer.current) clearTimeout(pushTimer.current);
       pushTimer.current = null;
+      // Never run two pushes at once: pushToCloud snapshots the store then does a
+      // full delete-missing, so an overlapping push could delete rows the other
+      // just wrote. If one's already in flight, its .then reschedules via the
+      // epoch check below, so this edit isn't lost.
+      if (pushInFlight.current) return;
+      pushInFlight.current = true;
+      const epochAtStart = editEpoch.current;
       pushToCloud(userId)
         .then(() => {
+          pushInFlight.current = false;
+          // A local edit landed while this push was in flight -- its data isn't
+          // in the cloud yet. Stay dirty (so a realtime echo pull can't clobber
+          // it) and push again; do NOT clear syncDirty.
+          if (editEpoch.current !== epochAtStart) {
+            if (!pushTimer.current) pushTimer.current = setTimeout(push, PUSH_DEBOUNCE_MS);
+            return;
+          }
           useGearStore.getState().setSyncDirty(false);
           // If teammate changes arrived while we were dirty, apply them now.
           if (pendingRemote.current) scheduleRemotePull();
         })
-        .catch((err) => console.warn('[sync] push failed', err));
+        .catch((err) => {
+          pushInFlight.current = false;
+          console.warn('[sync] push failed', err);
+        });
     };
     // Push right now (not debounced) if there is unsynced work -- used when the
     // tab is backgrounded/closed and on reconnect, to shrink the window where an
@@ -138,6 +165,10 @@ export function useCloudSync() {
           // This change came from a remote pull, not a user edit -- don't treat
           // it as dirty (which would push it straight back and loop).
           if (applyingRemote.current) return;
+          // Bump the edit epoch so a push already in flight knows fresh work
+          // landed and won't clear syncDirty (which would expose this edit to a
+          // clobbering echo pull).
+          editEpoch.current += 1;
           useGearStore.getState().setSyncDirty(true);
           if (pushTimer.current) clearTimeout(pushTimer.current);
           pushTimer.current = setTimeout(push, PUSH_DEBOUNCE_MS);
