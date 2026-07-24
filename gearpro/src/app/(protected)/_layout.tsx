@@ -34,6 +34,7 @@ export default function ProtectedLayout() {
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="trip/[id]" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="help" options={{ animation: 'slide_from_right' }} />
         </Stack>
       </View>
     </View>

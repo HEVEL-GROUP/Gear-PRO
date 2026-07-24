@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 
@@ -94,6 +94,31 @@ export default function YouScreen() {
           Signed in as {session?.user.email}
         </Text>
       </Card>
+
+      <View style={{ height: 12 }} />
+
+      <Pressable onPress={() => router.push('/help' as Href)}>
+        <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 }}>
+          <View
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 12,
+              backgroundColor: t.soft,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Ionicons name="help-buoy-outline" size={19} color={t.softText} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text }}>How Gear Pro works</Text>
+            <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 1 }}>
+              A quick guide to gear, trips, and packing
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
+        </Card>
+      </Pressable>
 
       <View style={{ height: 12 }} />
 
