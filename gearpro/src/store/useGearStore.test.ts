@@ -4,6 +4,7 @@ import {
   expiringGear,
   flaggedAssignments,
   groupByCategory,
+  hashGear,
   packedCount,
   Trip,
   tripLifecycle,
@@ -157,6 +158,23 @@ describe('useGearStore', () => {
         useGearStore.getState().trips.find((t) => t.id === tripId)!.assignments,
       ).toHaveLength(0);
     });
+
+    it('records the removed gear AND its cascaded assignment in pendingDeletes, for the sync layer to soft-delete', () => {
+      const tripId = useGearStore.getState().addTrip({
+        name: 'Trip', location: '', startDate: '', endDate: '', bags: [], assignments: [],
+      });
+      useGearStore.getState().addBag(tripId, { label: 'Pack', maxWeightLb: 40, color: '#000' });
+      const bagId = useGearStore.getState().trips.find((t) => t.id === tripId)!.bags[0].id;
+      const gearId = addGearAndGetId({ brand: 'B', name: 'N', category: 'Other', weightLb: 1, quantity: 1 });
+      useGearStore.getState().addAssignment(tripId, bagId, gearId);
+      const assignmentId = useGearStore.getState().trips.find((t) => t.id === tripId)!.assignments[0].id;
+
+      useGearStore.getState().removeGear(gearId);
+
+      const { pendingDeletes } = useGearStore.getState();
+      expect(pendingDeletes.gear_items).toEqual([gearId]);
+      expect(pendingDeletes.assignments).toEqual([assignmentId]);
+    });
   });
 
   describe('removeGearBulk', () => {
@@ -291,6 +309,93 @@ describe('useGearStore', () => {
       expect(assignments[0].bagId).toBe(bagBId);
       expect(assignments[0].quantity).toBe(3);
     });
+
+    it('moveAssignment records the merged-away assignment id in pendingDeletes (its row disappears, so the cloud must learn it was removed)', () => {
+      const { tripId, bagAId, bagBId, gearId } = setupTripWithTwoBags();
+      useGearStore.getState().addAssignment(tripId, bagAId, gearId, 2);
+      useGearStore.getState().addAssignment(tripId, bagBId, gearId, 1);
+      const movingId = useGearStore
+        .getState()
+        .trips.find((t) => t.id === tripId)!
+        .assignments.find((a) => a.bagId === bagAId)!.id;
+
+      useGearStore.getState().moveAssignment(tripId, movingId, bagBId);
+
+      expect(useGearStore.getState().pendingDeletes.assignments).toEqual([movingId]);
+    });
+
+    it('moveAssignment does NOT record a pendingDelete for a plain bag change (same row id survives)', () => {
+      const { tripId, bagAId, bagBId, gearId } = setupTripWithTwoBags();
+      useGearStore.getState().addAssignment(tripId, bagAId, gearId, 2);
+      const movingId = useGearStore.getState().trips.find((t) => t.id === tripId)!.assignments[0].id;
+
+      useGearStore.getState().moveAssignment(tripId, movingId, bagBId);
+
+      expect(useGearStore.getState().pendingDeletes.assignments).toEqual([]);
+      expect(useGearStore.getState().trips.find((t) => t.id === tripId)!.assignments[0].id).toBe(movingId);
+    });
+  });
+
+  describe('removeTrip (cascade tombstones)', () => {
+    it('records the trip AND every one of its own bags/assignments in pendingDeletes', () => {
+      const tripId = useGearStore.getState().addTrip({
+        name: 'Trip', location: '', startDate: '', endDate: '', bags: [], assignments: [],
+      });
+      useGearStore.getState().addBag(tripId, { label: 'Pack', maxWeightLb: 40, color: '#000' });
+      const bagId = useGearStore.getState().trips.find((t) => t.id === tripId)!.bags[0].id;
+      const gearId = addGearAndGetId({ brand: 'B', name: 'N', category: 'Other', weightLb: 1, quantity: 1 });
+      useGearStore.getState().addAssignment(tripId, bagId, gearId);
+      const assignmentId = useGearStore.getState().trips.find((t) => t.id === tripId)!.assignments[0].id;
+
+      useGearStore.getState().removeTrip(tripId);
+
+      const { pendingDeletes, trips } = useGearStore.getState();
+      expect(trips.some((t) => t.id === tripId)).toBe(false);
+      expect(pendingDeletes.trips).toEqual([tripId]);
+      expect(pendingDeletes.bags).toEqual([bagId]);
+      expect(pendingDeletes.assignments).toEqual([assignmentId]);
+    });
+  });
+
+  describe('removeBag (cascade tombstones)', () => {
+    it('records the bag AND its assignments in pendingDeletes, leaving other bags untouched', () => {
+      const tripId = useGearStore.getState().addTrip({
+        name: 'Trip', location: '', startDate: '', endDate: '', bags: [], assignments: [],
+      });
+      useGearStore.getState().addBag(tripId, { label: 'Doomed', maxWeightLb: 40, color: '#000' });
+      useGearStore.getState().addBag(tripId, { label: 'Survives', maxWeightLb: 40, color: '#111' });
+      const [doomedBagId, survivingBagId] = useGearStore.getState().trips.find((t) => t.id === tripId)!.bags.map((b) => b.id);
+      const gearId = addGearAndGetId({ brand: 'B', name: 'N', category: 'Other', weightLb: 1, quantity: 2 });
+      useGearStore.getState().addAssignment(tripId, doomedBagId, gearId);
+      useGearStore.getState().addAssignment(tripId, survivingBagId, gearId);
+      const doomedAssignmentId = useGearStore
+        .getState()
+        .trips.find((t) => t.id === tripId)!
+        .assignments.find((a) => a.bagId === doomedBagId)!.id;
+
+      useGearStore.getState().removeBag(tripId, doomedBagId);
+
+      const { pendingDeletes } = useGearStore.getState();
+      expect(pendingDeletes.bags).toEqual([doomedBagId]);
+      expect(pendingDeletes.assignments).toEqual([doomedAssignmentId]);
+    });
+  });
+
+  describe('removeAssignment', () => {
+    it('records the removed assignment in pendingDeletes', () => {
+      const tripId = useGearStore.getState().addTrip({
+        name: 'Trip', location: '', startDate: '', endDate: '', bags: [], assignments: [],
+      });
+      useGearStore.getState().addBag(tripId, { label: 'Pack', maxWeightLb: 40, color: '#000' });
+      const bagId = useGearStore.getState().trips.find((t) => t.id === tripId)!.bags[0].id;
+      const gearId = addGearAndGetId({ brand: 'B', name: 'N', category: 'Other', weightLb: 1, quantity: 1 });
+      useGearStore.getState().addAssignment(tripId, bagId, gearId);
+      const assignmentId = useGearStore.getState().trips.find((t) => t.id === tripId)!.assignments[0].id;
+
+      useGearStore.getState().removeAssignment(tripId, assignmentId);
+
+      expect(useGearStore.getState().pendingDeletes.assignments).toEqual([assignmentId]);
+    });
   });
 
   describe('returnTrip (shared-trip owner scoping)', () => {
@@ -367,6 +472,33 @@ describe('useGearStore', () => {
       expect(flagged).toHaveLength(1);
       expect(flagged[0].assignment.status).toBe('lost');
     });
+  });
+});
+
+// The sync layer's ENTIRE dirty/clean detection rests on hashGear (and its
+// hashTrip/hashBag/hashAssignment siblings) producing the SAME string for the
+// SAME content regardless of which side (a local object vs. one rebuilt from
+// a cloud row) computed it -- an adversarial review of an earlier draft of
+// this design flagged that exact asymmetry as a way for a row to look
+// permanently "dirty" and never converge. These pin the normalization down.
+describe('hashGear', () => {
+  const base = { brand: 'Hilleberg', name: 'Nallo 2', category: 'Shelter', weightLb: 5.5, quantity: 1 };
+
+  it('is identical for the same content regardless of undefined vs. omitted optional fields', () => {
+    expect(hashGear({ ...base, notes: undefined, expiration: undefined, photoUri: undefined })).toBe(
+      hashGear(base),
+    );
+  });
+
+  it('changes when any synced field changes', () => {
+    const h0 = hashGear(base);
+    expect(hashGear({ ...base, weightLb: 6 })).not.toBe(h0);
+    expect(hashGear({ ...base, name: 'Different' })).not.toBe(h0);
+    expect(hashGear({ ...base, notes: 'now has a note' })).not.toBe(h0);
+  });
+
+  it('is stable across repeated calls with equivalent objects', () => {
+    expect(hashGear({ ...base })).toBe(hashGear({ ...base }));
   });
 });
 

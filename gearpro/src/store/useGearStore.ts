@@ -149,6 +149,46 @@ export const uid = (): string => {
 
 export const isUuid = (id: string): boolean => UUID_RE.test(id);
 
+export const SYNC_TABLES = ['gear_items', 'trips', 'bags', 'assignments'] as const;
+export type SyncTable = (typeof SYNC_TABLES)[number];
+export type PendingDeletes = Record<SyncTable, string[]>;
+export const emptyPendingDeletes = (): PendingDeletes => ({
+  gear_items: [],
+  trips: [],
+  bags: [],
+  assignments: [],
+});
+
+function addPendingDeletes(current: PendingDeletes, adds: Partial<PendingDeletes>): PendingDeletes {
+  const next = { ...current };
+  for (const table of SYNC_TABLES) {
+    const toAdd = adds[table];
+    if (toAdd && toAdd.length) next[table] = [...next[table], ...toAdd];
+  }
+  return next;
+}
+
+// Content hashes for the sync layer's per-row dirty check: "does this row's
+// synced content still match what I last confirmed was pushed?" Deliberately
+// excludes id/ownerId/isDemo (identity/local-only, not synced content) and
+// uses the SAME `?? ''` normalization on every field regardless of which side
+// (a local object vs. a row rebuilt from a cloud fetch) it's called on, so a
+// local row and its cloud counterpart hash identically when their content
+// actually matches -- a mismatched normalization here would make a row look
+// permanently "dirty" and re-push every cycle forever.
+export function hashGear(g: Pick<GearItem, 'brand' | 'name' | 'category' | 'weightLb' | 'quantity' | 'notes' | 'expiration' | 'photoUri'>): string {
+  return JSON.stringify([g.brand ?? '', g.name, g.category, g.weightLb, g.quantity, g.notes ?? '', g.expiration ?? '', g.photoUri ?? '']);
+}
+export function hashTrip(t: Pick<Trip, 'name' | 'location' | 'locationLat' | 'locationLon' | 'startDate' | 'endDate'>): string {
+  return JSON.stringify([t.name, t.location ?? '', t.locationLat ?? null, t.locationLon ?? null, t.startDate ?? '', t.endDate ?? '']);
+}
+export function hashBag(b: Pick<Bag, 'label' | 'maxWeightLb' | 'color'>): string {
+  return JSON.stringify([b.label, b.maxWeightLb, b.color]);
+}
+export function hashAssignment(a: Pick<Assignment, 'gearId' | 'bagId' | 'quantity' | 'status' | 'statusReason'>): string {
+  return JSON.stringify([a.gearId, a.bagId, a.quantity, a.status, a.statusReason ?? '']);
+}
+
 const g = (
   id: string,
   brand: string,
@@ -237,6 +277,22 @@ type StoreState = {
   // never shows a teammate's items -- the shared-trip view resolves gear names
   // and weights from here when an assignment's gear isn't in `gear`.
   sharedGearById: Record<string, GearItem>;
+  // Per-row sync bookkeeping (id -> content hash of what was last confirmed
+  // pushed/pulled). The sync layer's ONLY way to tell "have I changed this row
+  // since I last synced it" without trusting any client clock: a row is
+  // locally dirty exactly when syncBaseline has an entry for its id AND that
+  // entry no longer matches the row's current hash. Absent-from-baseline is
+  // deliberately NOT treated as dirty -- see pullFromCloud's merge logic for
+  // why (a device syncing a row for the very first time must default to
+  // trusting the cloud, not its own possibly-stale copy).
+  syncBaseline: Record<string, string>;
+  // Rows explicitly removed locally (by id, per table) that still need a
+  // soft-delete pushed to the cloud. Populated ONLY by the removal mutators
+  // below -- never inferred from "this id vanished from the rendered nested
+  // trips/bags/assignments tree" -- because a bag/assignment can also vanish
+  // from view for an unrelated reason (losing access to a shared trip), which
+  // must never be mistaken for the user deleting their own row.
+  pendingDeletes: PendingDeletes;
   addCategory: (name: string) => void;
   renameCategory: (oldName: string, newName: string) => void;
   removeCategory: (name: string) => void;
@@ -278,6 +334,8 @@ export const useGearStore = create<StoreState>()(
       customCategories: [],
       syncDirty: false,
       sharedGearById: {},
+      syncBaseline: {},
+      pendingDeletes: emptyPendingDeletes(),
       setSyncDirty: (v) => set({ syncDirty: v }),
       // Custom categories tack onto the fixed CATEGORIES list (kept in sync
       // via `categories`, which is what every picker/grouping reads from) --
@@ -358,6 +416,8 @@ export const useGearStore = create<StoreState>()(
             customCategories: [],
             syncDirty: false,
             sharedGearById: {},
+            syncBaseline: {},
+            pendingDeletes: emptyPendingDeletes(),
           });
         } finally {
           localResetInProgress = false;
@@ -372,13 +432,24 @@ export const useGearStore = create<StoreState>()(
       // target of "remove forever" from the Needs Attention list, which is
       // meant to bypass that guard.
       removeGear: (id) =>
-        set((s) => ({
-          gear: s.gear.filter((it) => it.id !== id),
-          trips: s.trips.map((t) => ({
-            ...t,
-            assignments: t.assignments.filter((a) => a.gearId !== id),
-          })),
-        })),
+        set((s) => {
+          const strippedAssignmentIds = s.trips.flatMap((t) =>
+            t.assignments.filter((a) => a.gearId === id).map((a) => a.id),
+          );
+          return {
+            gear: s.gear.filter((it) => it.id !== id),
+            trips: s.trips.map((t) => ({
+              ...t,
+              assignments: t.assignments.filter((a) => a.gearId !== id),
+            })),
+            // Cascade the tombstone to the stripped assignments too, so they
+            // don't linger "live" in the cloud and get resurrected by a pull.
+            pendingDeletes: addPendingDeletes(s.pendingDeletes, {
+              gear_items: [id],
+              assignments: strippedAssignmentIds,
+            }),
+          };
+        }),
       // Bulk counterpart to removeGear: deletes every gear id in one atomic
       // state update (so the sync subscriber fires a single push, not one per
       // item) and cascades the same assignment cleanup. No-op on an empty list.
@@ -386,12 +457,19 @@ export const useGearStore = create<StoreState>()(
         set((s) => {
           const doomed = new Set(ids);
           if (doomed.size === 0) return s;
+          const strippedAssignmentIds = s.trips.flatMap((t) =>
+            t.assignments.filter((a) => doomed.has(a.gearId)).map((a) => a.id),
+          );
           return {
             gear: s.gear.filter((it) => !doomed.has(it.id)),
             trips: s.trips.map((t) => ({
               ...t,
               assignments: t.assignments.filter((a) => !doomed.has(a.gearId)),
             })),
+            pendingDeletes: addPendingDeletes(s.pendingDeletes, {
+              gear_items: ids,
+              assignments: strippedAssignmentIds,
+            }),
           };
         }),
       addTrip: (trip) => {
@@ -399,7 +477,22 @@ export const useGearStore = create<StoreState>()(
         set((s) => ({ trips: [...s.trips, { ...trip, id }] }));
         return id;
       },
-      removeTrip: (id) => set((s) => ({ trips: s.trips.filter((t) => t.id !== id) })),
+      // Cascades the tombstone to the trip's own bags/assignments -- without
+      // this, a deleted trip's children stay "live" in the cloud with no
+      // parent visible anywhere, and a future pull has no way to know they
+      // should go away too.
+      removeTrip: (id) =>
+        set((s) => {
+          const trip = s.trips.find((t) => t.id === id);
+          return {
+            trips: s.trips.filter((t) => t.id !== id),
+            pendingDeletes: addPendingDeletes(s.pendingDeletes, {
+              trips: [id],
+              bags: trip?.bags.map((b) => b.id) ?? [],
+              assignments: trip?.assignments.map((a) => a.id) ?? [],
+            }),
+          };
+        }),
       addAssignment: (tripId, bagId, gearId, quantity = 1) =>
         set((s) => ({
           trips: s.trips.map((t) => {
@@ -442,10 +535,17 @@ export const useGearStore = create<StoreState>()(
               ? t
               : { ...t, assignments: t.assignments.filter((a) => a.id !== assignmentId) },
           ),
+          pendingDeletes: addPendingDeletes(s.pendingDeletes, { assignments: [assignmentId] }),
         })),
       moveAssignment: (tripId, assignmentId, toBagId) =>
-        set((s) => ({
-          trips: s.trips.map((t) => {
+        set((s) => {
+          // Set when the move merges into an existing assignment at the
+          // destination bag -- the moving row's OWN id disappears (its
+          // quantity folds into the existing one), so it needs a tombstone
+          // just like an explicit remove; a plain bagId change re-uses the
+          // same row id and is picked up by the ordinary dirty-hash check.
+          let mergedAwayId: string | null = null;
+          const trips = s.trips.map((t) => {
             if (t.id !== tripId) return t;
             const moving = t.assignments.find((a) => a.id === assignmentId);
             if (!moving || moving.bagId === toBagId) return t;
@@ -453,6 +553,7 @@ export const useGearStore = create<StoreState>()(
               (a) => a.id !== assignmentId && a.gearId === moving.gearId && a.bagId === toBagId,
             );
             if (existing) {
+              mergedAwayId = assignmentId;
               return {
                 ...t,
                 assignments: t.assignments
@@ -468,8 +569,11 @@ export const useGearStore = create<StoreState>()(
                 a.id === assignmentId ? { ...a, bagId: toBagId } : a,
               ),
             };
-          }),
-        })),
+          });
+          return mergedAwayId
+            ? { trips, pendingDeletes: addPendingDeletes(s.pendingDeletes, { assignments: [mergedAwayId] }) }
+            : { trips };
+        }),
       returnTrip: (tripId, ownerId) =>
         set((s) => ({
           trips: s.trips.map((t) =>
@@ -500,22 +604,44 @@ export const useGearStore = create<StoreState>()(
           ),
         })),
       removeBag: (tripId, bagId) =>
-        set((s) => ({
-          trips: s.trips.map((t) =>
-            t.id !== tripId
-              ? t
-              : {
-                  ...t,
-                  bags: t.bags.filter((b) => b.id !== bagId),
-                  assignments: t.assignments.filter((a) => a.bagId !== bagId),
-                },
-          ),
-        })),
+        set((s) => {
+          const trip = s.trips.find((t) => t.id === tripId);
+          const strippedAssignmentIds =
+            trip?.assignments.filter((a) => a.bagId === bagId).map((a) => a.id) ?? [];
+          return {
+            trips: s.trips.map((t) =>
+              t.id !== tripId
+                ? t
+                : {
+                    ...t,
+                    bags: t.bags.filter((b) => b.id !== bagId),
+                    assignments: t.assignments.filter((a) => a.bagId !== bagId),
+                  },
+            ),
+            pendingDeletes: addPendingDeletes(s.pendingDeletes, {
+              bags: [bagId],
+              assignments: strippedAssignmentIds,
+            }),
+          };
+        }),
     }),
     {
       name: 'gearpro-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 1,
+      version: 2,
+      // v1 -> v2: adds syncBaseline/pendingDeletes for per-row sync. Every
+      // pre-existing local row is simply "not yet in baseline" -- which the
+      // new sync layer already treats as "trust the cloud for this row until
+      // I've confirmed a sync for it," so no data needs touching here, just
+      // backfilling the two new fields so older persisted state has them.
+      migrate: (persisted, version) => {
+        const state = persisted as StoreState;
+        if (version < 2) {
+          state.syncBaseline = {};
+          state.pendingDeletes = emptyPendingDeletes();
+        }
+        return state;
+      },
     },
   ),
 );

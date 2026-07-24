@@ -29,13 +29,26 @@ const REALTIME_TABLES = ['trips', 'bags', 'assignments', 'gear_items', 'trip_mem
  * retried on reconnect.
  *
  * Live updates: a Realtime subscription triggers a debounced pull when a
- * relevant row changes in the cloud. Two guards keep this safe:
- *  - a remote pull is SKIPPED while syncDirty (never clobber unsynced edits);
- *    the intent is remembered and retried right after the next successful push.
- *  - a pull replaces gear/trips with fresh objects, which would otherwise look
- *    like a local edit to the store subscriber and schedule a bogus push. The
- *    applyingRemote flag makes the subscriber ignore that one change, so a pull
- *    never ping-pongs into a push (and back via the echoed Realtime event).
+ * relevant row changes in the cloud.
+ *
+ * pushToCloud/pullFromCloud (lib/sync/index.ts) are per-row: push only ever
+ * sends a row whose content actually changed since its last confirmed sync,
+ * and pull only lets local win over the cloud for a row with POSITIVE
+ * evidence it changed (never merely because it hasn't been seen before).
+ * That means correctness here no longer depends on perfectly timing push vs.
+ * pull -- a pull can never clobber a genuinely dirty row, and a push can
+ * never lose an edit that lands mid-flight (the next cycle just re-detects
+ * it as still not matching baseline). The guards below are efficiency/
+ * scheduling niceties on top of that, not the thing preventing data loss:
+ *  - a remote pull is skipped while syncDirty, purely to avoid a redundant
+ *    round-trip right before a push is about to fire anyway; the intent is
+ *    remembered and retried right after the next push.
+ *  - applyingRemote stops a pull's own setState from looking like a user edit
+ *    to the store subscriber (which would otherwise schedule a bogus push and
+ *    ping-pong via the echoed Realtime event).
+ *  - pushInFlight avoids two pushes running concurrently (wasted duplicate
+ *    network calls; upserts are idempotent so this is an efficiency guard,
+ *    not a correctness one).
  */
 export function useCloudSync() {
   const { session } = useAuth();
@@ -47,14 +60,10 @@ export function useCloudSync() {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const applyingRemote = useRef(false);
   const pendingRemote = useRef(false);
-  // Guards against two pushes overlapping (pushToCloud snapshots state then
-  // does a full delete-missing, so concurrent pushes can delete each other's
-  // rows). editEpoch bumps on every real local edit; a push clears syncDirty
-  // only if the epoch is unchanged across its in-flight window -- otherwise an
-  // edit that landed mid-push would have its dirty flag wrongly cleared, and a
-  // realtime echo pull would then clobber it.
+  // Avoids two pushes running concurrently -- pure efficiency (skips a
+  // redundant duplicate network round-trip); pushToCloud's own per-row delta
+  // diff is what actually keeps concurrent edits safe.
   const pushInFlight = useRef(false);
-  const editEpoch = useRef(0);
 
   useEffect(() => {
     const clearTimers = () => {
@@ -119,23 +128,14 @@ export function useCloudSync() {
     const push = () => {
       if (pushTimer.current) clearTimeout(pushTimer.current);
       pushTimer.current = null;
-      // Never run two pushes at once: pushToCloud snapshots the store then does a
-      // full delete-missing, so an overlapping push could delete rows the other
-      // just wrote. If one's already in flight, its .then reschedules via the
-      // epoch check below, so this edit isn't lost.
+      // Skip if one's already running -- efficiency only; if an edit lands
+      // during this push, pushToCloud's own per-row hash check will still see
+      // it as unsent on the NEXT cycle regardless of what syncDirty says here.
       if (pushInFlight.current) return;
       pushInFlight.current = true;
-      const epochAtStart = editEpoch.current;
       pushToCloud(userId)
         .then(() => {
           pushInFlight.current = false;
-          // A local edit landed while this push was in flight -- its data isn't
-          // in the cloud yet. Stay dirty (so a realtime echo pull can't clobber
-          // it) and push again; do NOT clear syncDirty.
-          if (editEpoch.current !== epochAtStart) {
-            if (!pushTimer.current) pushTimer.current = setTimeout(push, PUSH_DEBOUNCE_MS);
-            return;
-          }
           useGearStore.getState().setSyncDirty(false);
           // If teammate changes arrived while we were dirty, apply them now.
           if (pendingRemote.current) scheduleRemotePull();
@@ -169,10 +169,6 @@ export function useCloudSync() {
           // Marking it dirty would make the next login push the demo seed over
           // the user's real cloud data (an account wipe).
           if (isLocalResetInProgress()) return;
-          // Bump the edit epoch so a push already in flight knows fresh work
-          // landed and won't clear syncDirty (which would expose this edit to a
-          // clobbering echo pull).
-          editEpoch.current += 1;
           useGearStore.getState().setSyncDirty(true);
           if (pushTimer.current) clearTimeout(pushTimer.current);
           pushTimer.current = setTimeout(push, PUSH_DEBOUNCE_MS);
