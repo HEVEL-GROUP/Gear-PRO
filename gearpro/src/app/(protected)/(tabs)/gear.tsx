@@ -247,6 +247,14 @@ export default function GearScreen() {
                 <Ionicons name="checkbox-outline" size={22} color={t.primary} />
               </Pressable>
             ) : null}
+            {/* Same action as the "Add gear" row at the bottom of the list --
+                this one's reachable without scrolling past a long library. */}
+            <Pressable
+              onPress={() => setModal({ open: true, editId: null })}
+              hitSlop={10}
+              style={{ padding: 6, marginTop: 2 }}>
+              <Ionicons name="add-circle-outline" size={22} color={t.primary} />
+            </Pressable>
           </>
         )}
       </View>
