@@ -5,8 +5,10 @@
 -- both, so this is built once rather than twice.
 --
 -- Source-agnostic by design: `network` on catalog_merchants lets this hold
--- AvantLink-fed products alongside hand-curated ones (a manually-entered
--- merchant with no live feed) without a schema change later.
+-- products fed by any of the three affiliate networks the growth plan
+-- targets (AvantLink, Impact, Pepperjam -- REI/onX, Impact-network brands,
+-- and KUIU respectively) alongside hand-curated ones (a manually-entered
+-- merchant with no live feed), without a schema change later.
 --
 -- Read-only from the client's point of view. Nothing here is user data, so
 -- there's no per-row owner and no per-user RLS -- anon/authenticated get a
@@ -16,7 +18,7 @@
 
 create table public.catalog_merchants (
   id uuid primary key default gen_random_uuid(),
-  network text not null default 'manual' check (network in ('avantlink', 'manual')),
+  network text not null default 'manual' check (network in ('avantlink', 'impact', 'pepperjam', 'manual')),
   external_merchant_id text,
   name text not null,
   website_url text,

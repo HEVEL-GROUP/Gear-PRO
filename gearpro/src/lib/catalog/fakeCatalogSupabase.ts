@@ -5,11 +5,15 @@
 // enough shape that reusing it would mean bolting a second dialect onto an
 // already-shared fake other tests depend on).
 //
-// Supports exactly the two calls syncCatalogFromAvantlinkFeed makes:
+// Supports exactly the two calls syncCatalogFromParsedFeed makes:
 //   .from(t).upsert(rows, { onConflict }).select(cols)
 //   .from(t).upsert(rows, { onConflict })   (awaited directly, no .select())
+//
+// naturalKey includes `network` for merchants, so two networks that happen
+// to reuse the same external merchant id (e.g. a coincidence between an
+// AvantLink id and an Impact campaign id) never collide.
 
-import type { CatalogSupabase } from './avantlinkFeed';
+import type { CatalogSupabase } from './syncCatalog';
 
 type CatalogRow = Record<string, unknown>;
 type CatalogTable = 'catalog_merchants' | 'catalog_products';
