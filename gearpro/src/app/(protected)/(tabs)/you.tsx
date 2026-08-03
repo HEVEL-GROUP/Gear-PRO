@@ -3,6 +3,7 @@ import { type Href, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
+import { AddToHomeScreenSheet } from '@/components/AddToHomeScreenSheet';
 import { ClearDemoDataSheet } from '@/components/ClearDemoDataSheet';
 import { DeleteAccountSheet } from '@/components/DeleteAccountSheet';
 import { Mark } from '@/components/Mark';
@@ -10,6 +11,7 @@ import { Card, Display, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { exportData } from '@/lib/export';
 import { tapLight } from '@/lib/haptics';
+import { useInstallPrompt } from '@/lib/pwa/useInstallPrompt';
 import { useProfile } from '@/lib/profile/useProfile';
 import { pushToCloud } from '@/lib/sync';
 import { demoDataCounts, useGearStore } from '@/store/useGearStore';
@@ -58,6 +60,8 @@ export default function YouScreen() {
   const [deleteSheetOpen, setDeleteSheetOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
+  const [addToHomeScreenOpen, setAddToHomeScreenOpen] = useState(false);
+  const installPrompt = useInstallPrompt();
 
   const demoCounts = useMemo(() => demoDataCounts(gear, trips), [gear, trips]);
   const hasDemoData = demoCounts.gear > 0 || demoCounts.trips > 0;
@@ -204,6 +208,42 @@ export default function YouScreen() {
         </Card>
       </Pressable>
 
+      {installPrompt.kind !== 'none' ? (
+        <>
+          <View style={{ height: 12 }} />
+          <Pressable
+            onPress={() => {
+              if (installPrompt.kind === 'android') installPrompt.install();
+              else setAddToHomeScreenOpen(true);
+            }}>
+            <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 }}>
+              <View
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  backgroundColor: t.soft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Ionicons name="phone-portrait-outline" size={19} color={t.softText} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text }}>
+                  {installPrompt.kind === 'android' ? 'Install GearPro' : 'Add to Home Screen'}
+                </Text>
+                <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 1 }}>
+                  {installPrompt.kind === 'android'
+                    ? 'Add a real app icon to your home screen'
+                    : 'A few taps in Safari — opens full-screen like a real app'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
+            </Card>
+          </Pressable>
+        </>
+      ) : null}
+
       {hasDemoData ? (
         <>
           <View style={{ height: 12 }} />
@@ -291,6 +331,7 @@ export default function YouScreen() {
 
       <ClearDemoDataSheet visible={demoSheetOpen} onClose={() => setDemoSheetOpen(false)} />
       <DeleteAccountSheet visible={deleteSheetOpen} onClose={() => setDeleteSheetOpen(false)} />
+      <AddToHomeScreenSheet visible={addToHomeScreenOpen} onClose={() => setAddToHomeScreenOpen(false)} />
     </Screen>
   );
 }
