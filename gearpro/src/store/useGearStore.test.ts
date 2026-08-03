@@ -6,6 +6,7 @@ import {
   groupByCategory,
   hashGear,
   packedCount,
+  sortTripsFeaturedFirst,
   Trip,
   tripLifecycle,
   useGearStore,
@@ -678,5 +679,57 @@ describe('packedCount (owner scoping)', () => {
   it("counts only the owner's checked-out units with an ownerId", () => {
     expect(packedCount(trip, 'me')).toBe(1);
     expect(packedCount(trip, 'mate')).toBe(2);
+  });
+});
+
+describe('sortTripsFeaturedFirst', () => {
+  const tripBase: Omit<Trip, 'id' | 'name' | 'startDate' | 'endDate'> = { location: '', bags: [], assignments: [] };
+
+  it('regression: an earlier-starting upcoming trip sorts before a later one, not by array order', () => {
+    // Reproduces the reported bug exactly: "Elk Hunt" (11/16) was appended
+    // to the store first and showed as the featured "NEXT UP" card ahead of
+    // "Mule Deer Hunt" (10/23), which starts sooner -- the old sort only
+    // compared lifecycle bucket, so two "upcoming" trips fell back to
+    // whatever order they happened to be in.
+    const elkHunt: Trip = { ...tripBase, id: 'elk', name: 'Elk Hunt', startDate: '2026-11-16', endDate: '2026-11-22' };
+    const muleDeerHunt: Trip = {
+      ...tripBase,
+      id: 'mule-deer',
+      name: 'Mule Deer Hunt',
+      startDate: '2026-10-23',
+      endDate: '2026-11-01',
+    };
+
+    const sorted = sortTripsFeaturedFirst([elkHunt, muleDeerHunt], TODAY);
+    expect(sorted.map((t) => t.name)).toEqual(['Mule Deer Hunt', 'Elk Hunt']);
+  });
+
+  it('a needs_return trip always sorts ahead of an upcoming one', () => {
+    const upcoming: Trip = { ...tripBase, id: 'u', name: 'Upcoming', startDate: '2026-08-01', endDate: '2026-08-05' };
+    const needsReturn: Trip = {
+      ...tripBase,
+      id: 'n',
+      name: 'Needs return',
+      startDate: '2026-07-01',
+      endDate: '2026-07-10',
+      assignments: [{ id: 'a', gearId: 'g', bagId: 'b', quantity: 1, status: 'checked_out' }],
+    };
+
+    const sorted = sortTripsFeaturedFirst([upcoming, needsReturn], TODAY);
+    expect(sorted.map((t) => t.name)).toEqual(['Needs return', 'Upcoming']);
+  });
+
+  it('among closed trips, the most recently ended one sorts first', () => {
+    const closedOld: Trip = { ...tripBase, id: 'old', name: 'Old', startDate: '2026-01-01', endDate: '2026-01-05' };
+    const closedRecent: Trip = {
+      ...tripBase,
+      id: 'recent',
+      name: 'Recent',
+      startDate: '2026-07-01',
+      endDate: '2026-07-10',
+    };
+
+    const sorted = sortTripsFeaturedFirst([closedOld, closedRecent], TODAY);
+    expect(sorted.map((t) => t.name)).toEqual(['Recent', 'Old']);
   });
 });

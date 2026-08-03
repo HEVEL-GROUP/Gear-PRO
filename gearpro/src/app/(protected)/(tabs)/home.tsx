@@ -16,6 +16,7 @@ import {
   gearMap,
   itemCount,
   packedCount,
+  sortTripsFeaturedFirst,
   todayStamp,
   Trip,
   TripLifecycle,
@@ -77,11 +78,7 @@ export default function TripsScreen() {
   const initials = initialsFrom(displayName?.trim() || session?.user.email || '?');
 
   const today = todayStamp();
-  // Surface a trip that needs return first — that's the one that actually needs attention.
-  const sorted = useMemo(() => {
-    const priority: Record<TripLifecycle, number> = { needs_return: 0, active: 1, upcoming: 2, closed: 3 };
-    return [...trips].sort((a, b) => priority[tripLifecycle(a, today)] - priority[tripLifecycle(b, today)]);
-  }, [trips, today]);
+  const sorted = useMemo(() => sortTripsFeaturedFirst(trips, today), [trips, today]);
   const featured = sorted[0];
   const rest = sorted.slice(1);
   const featuredLifecycle = featured ? tripLifecycle(featured, today) : 'upcoming';

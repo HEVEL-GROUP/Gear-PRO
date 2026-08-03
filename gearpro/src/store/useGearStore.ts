@@ -826,6 +826,28 @@ export function tripLifecycle(trip: Trip, todayStamp: string): TripLifecycle {
   return 'upcoming';
 }
 
+// Orders trips for the Trips screen: needs_return first (that's the one
+// that actually needs attention), then active, upcoming, closed. Within the
+// same lifecycle, ordered by whatever's most relevant to surface first --
+// soonest-ending for needs_return/active (most urgent), soonest-starting
+// for upcoming (what's actually coming up next), most-recently-ended for
+// closed (likeliest to still be relevant). Without this secondary sort, two
+// trips in the same bucket fell back to array order -- e.g. a trip
+// starting Oct 23 could sort behind one starting Nov 16 under the same
+// "Upcoming" label, and lose out on being the featured "NEXT UP" card to a
+// trip that wasn't actually next.
+export function sortTripsFeaturedFirst(trips: Trip[], todayStamp: string): Trip[] {
+  const priority: Record<TripLifecycle, number> = { needs_return: 0, active: 1, upcoming: 2, closed: 3 };
+  return [...trips].sort((a, b) => {
+    const la = tripLifecycle(a, todayStamp);
+    const lb = tripLifecycle(b, todayStamp);
+    if (priority[la] !== priority[lb]) return priority[la] - priority[lb];
+    if (la === 'closed') return (b.endDate || '').localeCompare(a.endDate || '');
+    const keyOf = (t: Trip) => (la === 'upcoming' ? t.startDate : t.endDate) || '';
+    return keyOf(a).localeCompare(keyOf(b));
+  });
+}
+
 export function todayStamp(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
