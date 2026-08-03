@@ -3,7 +3,6 @@ import { type Href, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, useWindowDimensions, View } from 'react-native';
 
-import { Button } from '@/components/form';
 import { ClearDemoDataSheet } from '@/components/ClearDemoDataSheet';
 import { DeleteAccountSheet } from '@/components/DeleteAccountSheet';
 import { Mark } from '@/components/Mark';
@@ -12,15 +11,9 @@ import { useAuth } from '@/lib/auth/AuthProvider';
 import { exportData } from '@/lib/export';
 import { tapLight } from '@/lib/haptics';
 import { useProfile } from '@/lib/profile/useProfile';
-import { openBillingPortal } from '@/lib/stripe/checkout';
-import { usePro } from '@/lib/stripe/usePro';
 import { pushToCloud } from '@/lib/sync';
 import { demoDataCounts, useGearStore } from '@/store/useGearStore';
 import { font, useTheme } from '@/theme/tokens';
-
-function daysLeft(isoDate: string): number {
-  return Math.max(0, Math.ceil((new Date(isoDate).getTime() - Date.now()) / 86_400_000));
-}
 
 function Row({ icon, title, subtitle }: { icon: any; title: string; subtitle: string }) {
   const t = useTheme();
@@ -53,7 +46,6 @@ export default function YouScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 880;
   const { session, signOut } = useAuth();
-  const { planType, source, trialEndsAt } = usePro();
   const { displayName, save: saveDisplayName } = useProfile();
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -61,18 +53,12 @@ export default function YouScreen() {
   const gear = useGearStore((s) => s.gear);
   const trips = useGearStore((s) => s.trips);
   const resetLocal = useGearStore((s) => s.resetLocal);
-  const [billingBusy, setBillingBusy] = useState(false);
-  const [billingError, setBillingError] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [demoSheetOpen, setDemoSheetOpen] = useState(false);
   const [deleteSheetOpen, setDeleteSheetOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
 
-  const isTrial = planType === 'trial';
-  // Only a real Stripe subscription has a billing-portal session to open --
-  // a manually-granted or demo access row has no Stripe customer behind it.
-  const hasStripeBilling = source === 'stripe';
   const demoCounts = useMemo(() => demoDataCounts(gear, trips), [gear, trips]);
   const hasDemoData = demoCounts.gear > 0 || demoCounts.trips > 0;
 
@@ -90,19 +76,6 @@ export default function YouScreen() {
       // leave the field open so the user can retry
     } finally {
       setNameSaving(false);
-    }
-  };
-
-  const handleBilling = async (action: () => Promise<void>) => {
-    if (billingBusy) return;
-    setBillingBusy(true);
-    setBillingError(null);
-    try {
-      await action();
-    } catch (err) {
-      setBillingError(err instanceof Error ? err.message : 'Something went wrong');
-    } finally {
-      setBillingBusy(false);
     }
   };
 
@@ -208,32 +181,28 @@ export default function YouScreen() {
 
       <View style={{ height: 12 }} />
 
-      {planType !== null && (
-        <Card style={{ paddingVertical: 16, gap: 10 }}>
-          <View>
-            <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text }}>
-              {isTrial ? 'Free trial' : 'GearPro Pro'}
-            </Text>
-            <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-              {isTrial && trialEndsAt
-                ? `${daysLeft(trialEndsAt)} day${daysLeft(trialEndsAt) === 1 ? '' : 's'} left — subscribe anytime`
-                : hasStripeBilling
-                  ? "You're supporting GearPro's development"
-                  : 'Complimentary access — no billing on this account'}
+      <Pressable onPress={() => router.push('/donate' as Href)}>
+        <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 }}>
+          <View
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 12,
+              backgroundColor: t.soft,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Ionicons name="heart-outline" size={19} color={t.softText} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text }}>Support GearPro</Text>
+            <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 1 }}>
+              GearPro is free — an optional way to help cover hosting costs
             </Text>
           </View>
-          {(isTrial || hasStripeBilling) && (
-            <Button
-              label={billingBusy ? 'Opening…' : isTrial ? 'Choose a plan' : 'Manage subscription'}
-              tone={isTrial ? 'primary' : 'ghost'}
-              onPress={() => (isTrial ? router.push('/subscribe') : handleBilling(openBillingPortal))}
-            />
-          )}
-          {billingError && (
-            <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.alert }}>{billingError}</Text>
-          )}
+          <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
         </Card>
-      )}
+      </Pressable>
 
       {hasDemoData ? (
         <>

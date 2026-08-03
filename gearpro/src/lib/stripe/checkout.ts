@@ -2,12 +2,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { supabase } from '@/lib/supabase/client';
 
-export type Plan = 'monthly' | 'annual';
-
-async function invoke(
-  functionName: 'stripe-checkout' | 'stripe-portal',
-  body?: Record<string, unknown>,
-): Promise<string> {
+async function invoke(functionName: 'stripe-donate', body?: Record<string, unknown>): Promise<string> {
   const { data, error } = await supabase.functions.invoke<{ url?: string; error?: string }>(functionName, {
     body,
   });
@@ -31,12 +26,10 @@ async function invoke(
   return data.url;
 }
 
-export async function startCheckout(plan: Plan): Promise<void> {
-  const url = await invoke('stripe-checkout', { plan });
-  await WebBrowser.openBrowserAsync(url);
-}
-
-export async function openBillingPortal(): Promise<void> {
-  const url = await invoke('stripe-portal');
+// GearPro is free -- this opens a one-time Stripe Checkout session for an
+// optional "support the app" payment, not a subscription. amountCents is
+// validated server-side too (stripe-donate); this call just forwards it.
+export async function startDonation(amountCents: number): Promise<void> {
+  const url = await invoke('stripe-donate', { amountCents });
   await WebBrowser.openBrowserAsync(url);
 }
