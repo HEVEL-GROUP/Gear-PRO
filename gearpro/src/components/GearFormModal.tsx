@@ -1,6 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -25,7 +23,6 @@ const blank = {
   weight: '',
   quantity: '1',
   notes: '',
-  photoUri: '',
   expiration: '',
 };
 
@@ -60,7 +57,6 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
             weight: String(editing.weightLb),
             quantity: String(editing.quantity),
             notes: editing.notes ?? '',
-            photoUri: editing.photoUri ?? '',
             expiration: editing.expiration ?? '',
           }
         : blank,
@@ -70,22 +66,6 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
   const inUse = editing
     ? trips.some((tr) => tr.assignments.some((a) => a.gearId === editing.id))
     : false;
-
-  const pickPhoto = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.5,
-      base64: true,
-    });
-    if (res.canceled) return;
-    const asset = res.assets[0];
-    const uri = asset.base64
-      ? `data:${asset.mimeType ?? 'image/jpeg'};base64,${asset.base64}`
-      : asset.uri;
-    setForm((f) => ({ ...f, photoUri: uri }));
-  };
 
   const save = () => {
     const weight = Number(form.weight);
@@ -105,7 +85,6 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
       weightLb: weight,
       quantity: Math.round(quantity),
       notes: form.notes.trim() || undefined,
-      photoUri: form.photoUri || undefined,
       expiration: form.expiration.trim() || undefined,
     };
     if (editing) updateGear(editing.id, payload);
@@ -130,40 +109,6 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
           <Text style={{ flex: 1, fontFamily: font.semibold, fontSize: 13, color: t.alertText }}>{notice}</Text>
         </View>
       ) : null}
-      <Label>Photo</Label>
-      {form.photoUri ? (
-        <View style={{ marginBottom: 14 }}>
-          <Pressable onPress={pickPhoto}>
-            <Image
-              source={{ uri: form.photoUri }}
-              style={{ width: '100%', height: 170, borderRadius: 14, backgroundColor: t.surfaceAlt }}
-              contentFit="cover"
-            />
-          </Pressable>
-          <Pressable onPress={() => setForm((f) => ({ ...f, photoUri: '' }))} style={{ marginTop: 8, alignSelf: 'flex-start' }}>
-            <Text style={{ fontFamily: font.semibold, fontSize: 13, color: t.alert }}>Remove photo</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <Pressable onPress={pickPhoto} style={{ marginBottom: 14 }}>
-          <View
-            style={{
-              height: 120,
-              borderRadius: 14,
-              borderWidth: 1,
-              borderStyle: 'dashed',
-              borderColor: t.border,
-              backgroundColor: t.surface,
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-            }}>
-            <Ionicons name="camera-outline" size={26} color={t.primary} />
-            <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.primary }}>Add photo</Text>
-          </View>
-        </Pressable>
-      )}
-
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1 }}>
           <Field label="Brand" value={form.brand} onChangeText={(v) => setForm((f) => ({ ...f, brand: v }))} placeholder="KUIU" />
