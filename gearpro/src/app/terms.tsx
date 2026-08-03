@@ -27,7 +27,7 @@ export default function TermsScreen() {
         <Mark size={32} fill={t.primary} check={t.mode === 'dark' ? t.bg : t.cream} />
         <Display style={{ fontSize: 22, marginTop: 12 }}>Terms of Service</Display>
         <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginTop: 4 }}>
-          Last updated July 23, 2026
+          Last updated August 3, 2026
         </Text>
       </View>
 
@@ -42,18 +42,16 @@ export default function TermsScreen() {
         planning, not a substitute for your own judgment or professional safety advice in the field.
       </Section>
 
-      <Section title="Accounts and trials">
-        You need an account to sync across devices. New accounts get a 7-day free trial; each email address
-        is eligible for one trial. You're responsible for keeping your login credentials secure and for all
-        activity under your account.
+      <Section title="Accounts">
+        You need an account to sync across devices. You&apos;re responsible for keeping your login
+        credentials secure and for all activity under your account.
       </Section>
 
-      <Section title="Subscriptions and billing">
-        After your trial, continued access requires an active paid subscription (billed monthly or
-        annually, as shown at checkout). Subscriptions renew automatically at the then-current price until
-        you cancel. Billing is processed by Stripe -- we never see or store your card details. You can
-        cancel anytime from the app's billing portal; cancellation takes effect at the end of your current
-        billing period, and we don't provide prorated refunds for partial periods.
+      <Section title="Gear Pro is free">
+        Gear Pro is free to use, with no subscription, trial period, or feature paywall. If you&apos;d like
+        to help cover hosting costs, you can make an optional one-time contribution from the app; it&apos;s
+        processed by Stripe (we never see or store your card details), it&apos;s entirely voluntary, and it
+        doesn&apos;t unlock any additional features or change your account in any way.
       </Section>
 
       <Section title="Acceptable use">
@@ -76,13 +74,13 @@ export default function TermsScreen() {
       <Section title="Limitation of liability">
         To the fullest extent permitted by law, Hevel Group isn't liable for any indirect, incidental, or
         consequential damages arising from your use of Gear Pro, including gear left behind, trip planning
-        errors, or forecast inaccuracies. Our total liability for any claim is limited to the amount you
-        paid us in the 12 months before the claim.
+        errors, or forecast inaccuracies. Because Gear Pro is provided free of charge, our total liability
+        for any claim is limited to $100.
       </Section>
 
       <Section title="Termination">
         You can stop using Gear Pro and delete your account at any time. We may suspend or terminate access
-        for violations of these terms or for non-payment.
+        for violations of these terms.
       </Section>
 
       <Section title="Changes to these terms">

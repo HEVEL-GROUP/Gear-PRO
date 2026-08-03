@@ -27,14 +27,17 @@ export default function PrivacyScreen() {
         <Mark size={32} fill={t.primary} check={t.mode === 'dark' ? t.bg : t.cream} />
         <Display style={{ fontSize: 22, marginTop: 12 }}>Privacy Policy</Display>
         <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted, marginTop: 4 }}>
-          Last updated July 23, 2026
+          Last updated August 3, 2026
         </Text>
       </View>
 
       <Section title="What Gear Pro stores">
         Your gear list, trips, bags, and packing status are stored on your device. If you create an
         account, that same data is also stored in our database (Supabase) so it can sync across your
-        devices. We collect the email address you sign up with, and nothing else about you.
+        devices. We collect the email address you sign up with. If you add gear matched to an item in our
+        product catalog, the weight you enter may be stored as a contribution toward that item&apos;s
+        community weight, tied to your account -- this is used only to help other users see accurate gear
+        weights, never shared or sold.
       </Section>
 
       <Section title="Location and weather">
@@ -46,8 +49,9 @@ export default function PrivacyScreen() {
       </Section>
 
       <Section title="Payment">
-        Subscription billing is handled by Stripe. We don't see or store your card details -- Stripe
-        processes payment and tells us only whether your subscription is active.
+        Gear Pro is free. If you choose to make an optional one-time contribution to support the app,
+        that payment is handled by Stripe -- we don&apos;t see or store your card details, and the payment
+        doesn&apos;t affect your account in any way.
       </Section>
 
       <Section title="Sign in with Google">
