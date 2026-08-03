@@ -51,24 +51,32 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
   const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
   const searchSeq = useRef(0);
 
-  // Debounced catalog search as the user types an item name -- 250ms so a
-  // fast typist doesn't fire a query per keystroke. searchSeq guards
-  // against an in-flight older query's response landing after a newer one
-  // (a slow first keystroke's result arriving after the third keystroke's)
-  // and clobbering the list with stale suggestions.
+  // Debounced catalog search as the user types brand and/or item name --
+  // 250ms so a fast typist doesn't fire a query per keystroke. searchSeq
+  // guards against an in-flight older query's response landing after a
+  // newer one (a slow first keystroke's result arriving after the third
+  // keystroke's) and clobbering the list with stale suggestions.
+  //
+  // Both fields feed ONE combined query rather than triggering separate
+  // searches, because the ranking (search_catalog_products, trigram
+  // similarity against brand+name) is what makes a bare brand ever safe to
+  // search on: "KUIU" alone scores a loose brand-level match against every
+  // KUIU product, but "KUIU rain" sharpens to the actual rain jacket. Firing
+  // brand and name as independent queries would lose that combination.
+  const combinedQuery = `${form.brand} ${form.name}`.trim();
   useEffect(() => {
-    if (!visible || editing || suggestionsDismissed || form.name.trim().length < MIN_QUERY_LENGTH) {
+    if (!visible || editing || suggestionsDismissed || combinedQuery.length < MIN_QUERY_LENGTH) {
       setSuggestions([]);
       return;
     }
     const seq = ++searchSeq.current;
     const timer = setTimeout(() => {
-      searchCatalogProducts(form.name).then((results) => {
+      searchCatalogProducts(combinedQuery).then((results) => {
         if (searchSeq.current === seq) setSuggestions(results);
       });
     }, 250);
     return () => clearTimeout(timer);
-  }, [form.name, visible, editing, suggestionsDismissed]);
+  }, [combinedQuery, visible, editing, suggestionsDismissed]);
 
   const applySuggestion = (s: CatalogSuggestion) => {
     setForm((f) => ({

@@ -1,10 +1,22 @@
 import { supabase } from '@/lib/supabase/client';
 
-// Powers the "Add gear" autocomplete: as the user types a brand or item
+// Powers the "Add gear" autocomplete: as the user types a brand and/or item
 // name, suggest real catalog products so the form can be filled from a
-// known product instead of typed by hand. Read-only against catalog_products
-// (RLS already allows anon/authenticated SELECT -- see the product_catalog
-// migration), so this needs no auth check of its own.
+// known product instead of typed by hand. Read-only against
+// catalog_products via the search_catalog_products() function (RLS already
+// allows anon/authenticated SELECT on the table itself -- see the
+// product_catalog migration -- and EXECUTE on the function mirrors that same
+// public-read posture), so this needs no auth check of its own.
+//
+// Ranked by trigram similarity (search_catalog_products, see the
+// catalog_fuzzy_search migration) against `brand + ' ' + name`, not plain
+// ILIKE substring matching. Substring matching had no concept of relevance:
+// a bare brand match surfaced every product from that brand as an
+// equally-weighted "match" regardless of whether the item name had anything
+// to do with it, and a one-character brand ("Q") matched any product name
+// containing that letter. Trigram scoring fixes both -- verified against
+// real production gear data (a 119-item library): unrelated real item names
+// scored 0.000-0.065, genuine matches scored 0.12+.
 
 export type CatalogSuggestion = {
   id: string;
@@ -14,27 +26,19 @@ export type CatalogSuggestion = {
   weightLb: number | null;
 };
 
-// Below this length, ILIKE '%q%' has poor selectivity (near-matches
-// everything) and isn't worth a round-trip -- the form should hold off
-// searching until there's enough signal in what's typed.
+// Below this length there's rarely enough signal in the typed text to beat
+// the similarity threshold anyway, and it's not worth a round-trip to find
+// that out server-side.
 export const MIN_QUERY_LENGTH = 2;
 
 export async function searchCatalogProducts(query: string, limit = 8): Promise<CatalogSuggestion[]> {
   const q = query.trim();
   if (q.length < MIN_QUERY_LENGTH) return [];
 
-  // Escape ILIKE wildcards a user might type literally so they're matched
-  // as plain characters, not pattern syntax.
-  const escaped = q.replace(/[%_]/g, (c) => `\\${c}`);
-  const { data, error } = await supabase
-    .from('catalog_products')
-    .select('id, brand, name, category, weight_lb')
-    .or(`name.ilike.%${escaped}%,brand.ilike.%${escaped}%`)
-    .order('name')
-    .limit(limit);
+  const { data, error } = await supabase.rpc('search_catalog_products', { query: q, match_limit: limit });
 
   if (error) throw new Error(error.message);
-  return (data ?? []).map((r) => ({
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
     id: r.id as string,
     brand: (r.brand as string) ?? '',
     name: r.name as string,
