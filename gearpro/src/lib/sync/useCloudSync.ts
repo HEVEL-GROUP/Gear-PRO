@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { supabase } from '@/lib/supabase/client';
@@ -64,6 +64,15 @@ export function useCloudSync() {
   // redundant duplicate network round-trip); pushToCloud's own per-row delta
   // diff is what actually keeps concurrent edits safe.
   const pushInFlight = useRef(false);
+  // True once syncOnLogin's initial pull/push has settled for the CURRENT
+  // userId (success or failure -- see the .finally() below). Callers (the
+  // protected layout) gate rendering on this so the store's default/demo
+  // seed state -- what a fresh mount shows before this hook's async work
+  // resolves, since AsyncStorage rehydration and the cloud pull both take a
+  // beat -- is never visible for an account that actually has real cloud
+  // data. Starts false on every new userId, including a fresh login right
+  // after a previous session's logout.
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const clearTimers = () => {
@@ -86,11 +95,13 @@ export function useCloudSync() {
     if (!userId) {
       teardown();
       syncedUserId.current = null;
+      setReady(false);
       return;
     }
 
     if (syncedUserId.current === userId) return;
     syncedUserId.current = userId;
+    setReady(false);
 
     // A teammate (or another device) changed a visible row -> refresh, unless we
     // have unsynced local edits, in which case remember to pull once they land.
@@ -160,6 +171,10 @@ export function useCloudSync() {
       .catch((err) => console.warn('[sync] initial sync failed, continuing offline', err))
       .finally(() => {
         if (cancelled) return;
+        // Runs even when syncOnLogin failed (e.g. offline) -- this app has to
+        // keep working without signal, so "sync didn't succeed" must still
+        // unblock rendering rather than hang on it forever.
+        setReady(true);
         storeUnsub.current = useGearStore.subscribe((state, prev) => {
           if (state.gear === prev.gear && state.trips === prev.trips) return;
           // This change came from a remote pull, not a user edit -- don't treat
@@ -202,4 +217,6 @@ export function useCloudSync() {
       }
     };
   }, [userId]);
+
+  return { ready };
 }

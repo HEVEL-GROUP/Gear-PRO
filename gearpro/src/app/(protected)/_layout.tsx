@@ -14,9 +14,17 @@ export default function ProtectedLayout() {
   const t = useTheme();
   const { width } = useWindowDimensions();
   const isWide = width >= 880;
-  useCloudSync();
+  const { ready } = useCloudSync();
 
-  if (isLoading) {
+  // Gate on the initial cloud sync too, not just auth -- without this, the
+  // gear/trip screens can mount and read the store's default (demo-seed)
+  // state during the window between mount and syncOnLogin's cloud pull
+  // actually landing, which briefly showed demo content for accounts that
+  // have real cloud data (worse right after a fresh logout->login, since
+  // AsyncStorage rehydration and the pull both take a beat). Previously
+  // masked, by accident, by the old Pro-status check's own async delay --
+  // removing that gate for the free-forever pivot exposed this.
+  if (isLoading || (session && !ready)) {
     return <View style={{ flex: 1, backgroundColor: t.bg }} />;
   }
 

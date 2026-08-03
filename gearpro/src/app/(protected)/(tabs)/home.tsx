@@ -122,6 +122,7 @@ export default function TripsScreen() {
             barColors={barColors}
             lifecycle={featuredLifecycle}
             shared={isTripShared(featured)}
+            isDemo={featured.isDemo}
           />
         </Touchable>
       ) : null}
@@ -149,6 +150,9 @@ export default function TripsScreen() {
                 {trip.location} · {fmtRange(trip.startDate, trip.endDate)}
               </Text>
               <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                {trip.isDemo ? (
+                  <Chip label="Demo data" tone="alert" icon={<Ionicons name="flask-outline" size={12} color={t.alertText} />} />
+                ) : null}
                 <LifecycleChip trip={trip} today={today} />
                 {isTripShared(trip) ? (
                   <Chip label="Shared" tone="sage" icon={<Ionicons name="people" size={12} color={t.softText} />} />
