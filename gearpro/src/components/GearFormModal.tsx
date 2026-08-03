@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Button, ChipPicker, Field, Label, Sheet } from '@/components/form';
 import { DatePickerSheet } from '@/components/DatePickerSheet';
+import { type CatalogSuggestion, MIN_QUERY_LENGTH, searchCatalogProducts } from '@/lib/catalog/searchCatalog';
 import { font, useTheme } from '@/theme/tokens';
 import { useGearStore } from '@/store/useGearStore';
 
@@ -46,11 +47,47 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
   const [error, setError] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<CatalogSuggestion[]>([]);
+  const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
+  const searchSeq = useRef(0);
+
+  // Debounced catalog search as the user types an item name -- 250ms so a
+  // fast typist doesn't fire a query per keystroke. searchSeq guards
+  // against an in-flight older query's response landing after a newer one
+  // (a slow first keystroke's result arriving after the third keystroke's)
+  // and clobbering the list with stale suggestions.
+  useEffect(() => {
+    if (!visible || editing || suggestionsDismissed || form.name.trim().length < MIN_QUERY_LENGTH) {
+      setSuggestions([]);
+      return;
+    }
+    const seq = ++searchSeq.current;
+    const timer = setTimeout(() => {
+      searchCatalogProducts(form.name).then((results) => {
+        if (searchSeq.current === seq) setSuggestions(results);
+      });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [form.name, visible, editing, suggestionsDismissed]);
+
+  const applySuggestion = (s: CatalogSuggestion) => {
+    setForm((f) => ({
+      ...f,
+      brand: s.brand || f.brand,
+      name: s.name,
+      category: categories.includes(s.category) ? s.category : f.category,
+      weight: s.weightLb != null ? String(s.weightLb) : f.weight,
+    }));
+    setSuggestions([]);
+    setSuggestionsDismissed(true);
+  };
 
   useEffect(() => {
     if (!visible) return;
     setError('');
     setConfirmingDelete(false);
+    setSuggestions([]);
+    setSuggestionsDismissed(false);
     setForm(
       editing
         ? {
@@ -172,6 +209,44 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
           <Field label="Item name" value={form.name} onChangeText={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="Super Down jacket" />
         </View>
       </View>
+
+      {suggestions.length > 0 ? (
+        <View
+          style={{
+            backgroundColor: t.surface,
+            borderWidth: 1,
+            borderColor: t.border,
+            borderRadius: 14,
+            marginTop: -6,
+            marginBottom: 14,
+            overflow: 'hidden',
+          }}>
+          {suggestions.map((s, i) => (
+            <Pressable
+              key={s.id}
+              onPress={() => applySuggestion(s)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                borderTopWidth: i === 0 ? 0 : 1,
+                borderTopColor: t.border,
+              }}>
+              <Ionicons name="pricetag-outline" size={16} color={t.textMuted} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: font.semibold, fontSize: 14, color: t.text }}>{s.name}</Text>
+                <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>
+                  {s.brand ? `${s.brand} · ` : ''}
+                  {s.category}
+                  {s.weightLb != null ? ` · ${s.weightLb} lb` : ''}
+                </Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       <ChipPicker
         label="Category"
