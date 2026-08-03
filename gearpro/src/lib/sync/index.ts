@@ -28,6 +28,7 @@ function toGearRow(userId: string, g: GearItem) {
     notes: g.notes ?? null,
     expiration: g.expiration || null,
     photo_uri: g.photoUri ?? null,
+    catalog_product_id: g.catalogProductId ?? null,
     is_demo: g.isDemo ?? false,
   };
 }
@@ -299,6 +300,7 @@ export async function pullFromCloud(
           notes: r.notes ?? undefined,
           expiration: r.expiration ?? undefined,
           photoUri: r.photo_uri ?? undefined,
+          catalogProductId: r.catalog_product_id ?? undefined,
           isDemo: false,
           ownerId: r.user_id,
         };
@@ -325,6 +327,7 @@ export async function pullFromCloud(
       notes: r.notes ?? undefined,
       expiration: r.expiration ?? undefined,
       photoUri: r.photo_uri ?? undefined,
+      catalogProductId: r.catalog_product_id ?? undefined,
       isDemo: false,
       ownerId: r.user_id,
     };

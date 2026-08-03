@@ -20,6 +20,12 @@ export type GearItem = {
   notes?: string;
   expiration?: string;
   photoUri?: string;
+  // Set once, at creation, when this item was matched to a catalog product
+  // via the Add Gear suggestion picker. Persisted (not re-derived) because
+  // suggestions deliberately don't reappear once editing an existing item --
+  // this is what lets a later weight edit still count as a submission for
+  // that product. See catalog/submitWeight.ts.
+  catalogProductId?: string;
   // True only for the sample items Gear Pro ships with -- an explicit flag
   // rather than inferring from id shape, because syncOnLogin remaps every
   // non-UUID local id to a real UUID on first cloud sync, which would
@@ -176,8 +182,20 @@ function addPendingDeletes(current: PendingDeletes, adds: Partial<PendingDeletes
 // local row and its cloud counterpart hash identically when their content
 // actually matches -- a mismatched normalization here would make a row look
 // permanently "dirty" and re-push every cycle forever.
-export function hashGear(g: Pick<GearItem, 'brand' | 'name' | 'category' | 'weightLb' | 'quantity' | 'notes' | 'expiration' | 'photoUri'>): string {
-  return JSON.stringify([g.brand ?? '', g.name, g.category, g.weightLb, g.quantity, g.notes ?? '', g.expiration ?? '', g.photoUri ?? '']);
+export function hashGear(
+  g: Pick<GearItem, 'brand' | 'name' | 'category' | 'weightLb' | 'quantity' | 'notes' | 'expiration' | 'photoUri' | 'catalogProductId'>,
+): string {
+  return JSON.stringify([
+    g.brand ?? '',
+    g.name,
+    g.category,
+    g.weightLb,
+    g.quantity,
+    g.notes ?? '',
+    g.expiration ?? '',
+    g.photoUri ?? '',
+    g.catalogProductId ?? '',
+  ]);
 }
 export function hashTrip(t: Pick<Trip, 'name' | 'location' | 'locationLat' | 'locationLon' | 'startDate' | 'endDate'>): string {
   return JSON.stringify([t.name, t.location ?? '', t.locationLat ?? null, t.locationLon ?? null, t.startDate ?? '', t.endDate ?? '']);

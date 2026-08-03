@@ -7,7 +7,9 @@ import { Keyboard, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Button, ChipPicker, Field, Label, Sheet } from '@/components/form';
 import { DatePickerSheet } from '@/components/DatePickerSheet';
+import { useAuth } from '@/lib/auth/AuthProvider';
 import { type CatalogSuggestion, MIN_QUERY_LENGTH, searchCatalogProducts } from '@/lib/catalog/searchCatalog';
+import { submitCatalogWeight } from '@/lib/catalog/submitWeight';
 import { tapLight } from '@/lib/haptics';
 import { font, useTheme } from '@/theme/tokens';
 import { useGearStore } from '@/store/useGearStore';
@@ -38,12 +40,14 @@ const blank = {
   notes: '',
   photoUri: '',
   expiration: '',
+  catalogProductId: null as string | null,
 };
 
 const isValidDate = (s: string) => s === '' || /^\d{4}-\d{2}-\d{2}$/.test(s.trim());
 
 export function GearFormModal({ visible, onClose, editId, notice }: Props) {
   const t = useTheme();
+  const { session } = useAuth();
   const gear = useGearStore((s) => s.gear);
   const trips = useGearStore((s) => s.trips);
   const categories = useGearStore((s) => s.categories);
@@ -109,6 +113,7 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
       name: s.name,
       category: categories.includes(s.category) ? s.category : f.category,
       weight: s.weightLb != null ? String(s.weightLb) : f.weight,
+      catalogProductId: s.id,
     }));
     setSuggestions([]);
     setSuggestionsDismissed(true);
@@ -132,6 +137,7 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
             notes: editing.notes ?? '',
             photoUri: editing.photoUri ?? '',
             expiration: editing.expiration ?? '',
+            catalogProductId: editing.catalogProductId ?? null,
           }
         : blank,
     );
@@ -177,9 +183,19 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
       notes: form.notes.trim() || undefined,
       photoUri: form.photoUri || undefined,
       expiration: form.expiration.trim() || undefined,
+      catalogProductId: form.catalogProductId ?? undefined,
     };
     if (editing) updateGear(editing.id, payload);
     else addGear(payload);
+    // Fire-and-forget, after the local save already succeeded -- the weight
+    // the user just entered for their own gear doubles as a submission for
+    // whichever catalog product this item is linked to (set once, at
+    // creation, via applySuggestion). Never blocks or can fail the actual
+    // save; see submitCatalogWeight's own module comment for why a failure
+    // here is silently dropped rather than surfaced.
+    if (form.catalogProductId && session?.user.id) {
+      submitCatalogWeight(session.user.id, form.catalogProductId, weight);
+    }
     onClose();
   };
 
