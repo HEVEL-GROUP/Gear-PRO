@@ -24,6 +24,11 @@ export type CatalogSuggestion = {
   name: string;
   category: string;
   weightLb: number | null;
+  // The affiliate-tracked link when the catalog has one -- that's the
+  // actual revenue mechanism this catalog exists for -- falling back to the
+  // plain product page for rows without an affiliate program (e.g. a
+  // manually-curated merchant). Null if the row has neither.
+  link: string | null;
 };
 
 // Below this length there's rarely enough signal in the typed text to beat
@@ -44,5 +49,6 @@ export async function searchCatalogProducts(query: string, limit = 8): Promise<C
     name: r.name as string,
     category: r.category as string,
     weightLb: (r.weight_lb as number | null) ?? null,
+    link: (r.affiliate_url as string | null) ?? (r.product_url as string | null) ?? null,
   }));
 }

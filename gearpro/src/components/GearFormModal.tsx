@@ -1,14 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Button, ChipPicker, Field, Label, Sheet } from '@/components/form';
 import { DatePickerSheet } from '@/components/DatePickerSheet';
 import { type CatalogSuggestion, MIN_QUERY_LENGTH, searchCatalogProducts } from '@/lib/catalog/searchCatalog';
+import { tapLight } from '@/lib/haptics';
 import { font, useTheme } from '@/theme/tokens';
 import { useGearStore } from '@/store/useGearStore';
+
+// Capped low, and rendered in a height-limited scroller (below) -- this
+// shows up in a bottom sheet with a phone keyboard already covering half
+// the screen, so the visible area for suggestions is small. 4 full rows
+// fit comfortably above a keyboard on a typical phone without pushing the
+// rest of the form out of reach.
+const SUGGESTION_LIMIT = 4;
+const SUGGESTION_LIST_MAX_HEIGHT = 4 * 56;
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function fmtDate(s: string): string {
@@ -49,6 +59,7 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<CatalogSuggestion[]>([]);
   const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
+  const [searching, setSearching] = useState(false);
   const searchSeq = useRef(0);
 
   // Debounced catalog search as the user types brand and/or item name --
@@ -63,22 +74,35 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
   // search on: "KUIU" alone scores a loose brand-level match against every
   // KUIU product, but "KUIU rain" sharpens to the actual rain jacket. Firing
   // brand and name as independent queries would lose that combination.
+  //
+  // This app is explicitly offline-first and used in the backcountry --
+  // a failed/timed-out search (no signal at a trailhead) is an expected,
+  // routine outcome, not an error worth surfacing. It fails silently into
+  // "no suggestions," same as if the catalog just didn't have a match.
   const combinedQuery = `${form.brand} ${form.name}`.trim();
   useEffect(() => {
     if (!visible || editing || suggestionsDismissed || combinedQuery.length < MIN_QUERY_LENGTH) {
       setSuggestions([]);
+      setSearching(false);
       return;
     }
     const seq = ++searchSeq.current;
     const timer = setTimeout(() => {
-      searchCatalogProducts(combinedQuery).then((results) => {
-        if (searchSeq.current === seq) setSuggestions(results);
-      });
+      setSearching(true);
+      searchCatalogProducts(combinedQuery, SUGGESTION_LIMIT)
+        .catch(() => [])
+        .then((results) => {
+          if (searchSeq.current !== seq) return;
+          setSuggestions(results);
+          setSearching(false);
+        });
     }, 250);
     return () => clearTimeout(timer);
   }, [combinedQuery, visible, editing, suggestionsDismissed]);
 
   const applySuggestion = (s: CatalogSuggestion) => {
+    tapLight();
+    Keyboard.dismiss();
     setForm((f) => ({
       ...f,
       brand: s.brand || f.brand,
@@ -96,6 +120,7 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
     setConfirmingDelete(false);
     setSuggestions([]);
     setSuggestionsDismissed(false);
+    setSearching(false);
     setForm(
       editing
         ? {
@@ -218,7 +243,18 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
         </View>
       </View>
 
-      {suggestions.length > 0 ? (
+      {searching ? (
+        <Text
+          style={{
+            fontFamily: font.medium,
+            fontSize: 12,
+            color: t.textMuted,
+            marginTop: -6,
+            marginBottom: 14,
+          }}>
+          Searching…
+        </Text>
+      ) : suggestions.length > 0 ? (
         <View
           style={{
             backgroundColor: t.surface,
@@ -227,32 +263,56 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
             borderRadius: 14,
             marginTop: -6,
             marginBottom: 14,
+            maxHeight: SUGGESTION_LIST_MAX_HEIGHT,
             overflow: 'hidden',
           }}>
-          {suggestions.map((s, i) => (
-            <Pressable
-              key={s.id}
-              onPress={() => applySuggestion(s)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 10,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-                borderTopWidth: i === 0 ? 0 : 1,
-                borderTopColor: t.border,
-              }}>
-              <Ionicons name="pricetag-outline" size={16} color={t.textMuted} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: font.semibold, fontSize: 14, color: t.text }}>{s.name}</Text>
-                <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>
-                  {s.brand ? `${s.brand} · ` : ''}
-                  {s.category}
-                  {s.weightLb != null ? ` · ${s.weightLb} lb` : ''}
-                </Text>
-              </View>
-            </Pressable>
-          ))}
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {suggestions.map((s, i) => (
+              <Pressable
+                key={s.id}
+                onPress={() => applySuggestion(s)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  minHeight: 56,
+                  borderTopWidth: i === 0 ? 0 : 1,
+                  borderTopColor: t.border,
+                }}>
+                <Ionicons name="pricetag-outline" size={16} color={t.textMuted} />
+                <View style={{ flex: 1 }}>
+                  <Text numberOfLines={1} style={{ fontFamily: font.semibold, fontSize: 14, color: t.text }}>
+                    {s.name}
+                  </Text>
+                  <Text numberOfLines={1} style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>
+                    {s.brand ? `${s.brand} · ` : ''}
+                    {s.category}
+                    {s.weightLb != null ? ` · ${s.weightLb} lb` : ''}
+                  </Text>
+                </View>
+                {s.link ? (
+                  // Separate tap target from the row itself -- tapping the
+                  // row fills the form, tapping this opens the real listing,
+                  // and they shouldn't be the same gesture on a touchscreen.
+                  // stopPropagation matters on web (this app's only shipped
+                  // platform so far): react-native-web's Pressable bubbles
+                  // through the DOM, so without it this would ALSO fire the
+                  // row's onPress and fill the form on every link tap.
+                  <Pressable
+                    hitSlop={8}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      WebBrowser.openBrowserAsync(s.link!);
+                    }}
+                    style={{ padding: 4 }}>
+                    <Ionicons name="open-outline" size={18} color={t.primary} />
+                  </Pressable>
+                ) : null}
+              </Pressable>
+            ))}
+          </ScrollView>
         </View>
       ) : null}
 
