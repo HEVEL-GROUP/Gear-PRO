@@ -4,27 +4,24 @@ import { useWindowDimensions, View } from 'react-native';
 import { Sidebar } from '@/components/Sidebar';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { useCloudSync } from '@/lib/sync/useCloudSync';
-import { usePro } from '@/lib/stripe/usePro';
 import { useTheme } from '@/theme/tokens';
 
+// GearPro is free -- being signed in is the only gate. There is no Pro/trial
+// check here anymore; see the You tab for an optional, non-gating "Support
+// GearPro" donation link instead.
 export default function ProtectedLayout() {
   const { session, isLoading } = useAuth();
-  const { isPro } = usePro();
   const t = useTheme();
   const { width } = useWindowDimensions();
   const isWide = width >= 880;
   useCloudSync();
 
-  if (isLoading || (session && isPro === null)) {
+  if (isLoading) {
     return <View style={{ flex: 1, backgroundColor: t.bg }} />;
   }
 
   if (!session) {
     return <Redirect href="/login" />;
-  }
-
-  if (!isPro) {
-    return <Redirect href="/subscribe" />;
   }
 
   return (

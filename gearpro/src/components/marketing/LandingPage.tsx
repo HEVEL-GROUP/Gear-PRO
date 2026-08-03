@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ReactNode } from 'react';
-import { ScrollView, Text, useWindowDimensions, View, ViewStyle } from 'react-native';
+import { Linking, ScrollView, Text, useWindowDimensions, View, ViewStyle } from 'react-native';
 
 import { FeaturedCard } from '@/components/TripCard';
 import { Mark } from '@/components/Mark';
@@ -45,9 +45,9 @@ const TRUST_POINTS: { icon: keyof typeof Ionicons.glyphMap; title: string; body:
     body: 'Your gear list lives on your device whether you have signal or not. Sync happens quietly in the background.',
   },
   {
-    icon: 'card-outline',
-    title: 'Cancel anytime',
-    body: 'No lock-in, no hidden fees. Manage or cancel your subscription yourself, anytime, from the app.',
+    icon: 'heart-outline',
+    title: 'Free, no catch',
+    body: 'No trial countdown, no credit card, no paywall buried inside the app. Sign up and start tracking gear.',
   },
 ];
 
@@ -154,7 +154,7 @@ function NavBar({ onLogin, onSignup }: { onLogin: () => void; onSignup: () => vo
       </Touchable>
       <Touchable onPress={onSignup}>
         <View style={{ backgroundColor: t.primary, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10 }}>
-          <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.onPrimary }}>Start free trial</Text>
+          <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.onPrimary }}>Sign up free</Text>
         </View>
       </Touchable>
     </View>
@@ -229,7 +229,7 @@ export function LandingPage() {
               <Touchable onPress={() => router.push('/signup')}>
                 <View style={{ backgroundColor: t.primary, borderRadius: 14, paddingHorizontal: 22, paddingVertical: 15 }}>
                   <Text style={{ fontFamily: font.bold, fontSize: 16, color: t.onPrimary }}>
-                    Start 7-day free trial
+                    Get started — it&apos;s free
                   </Text>
                 </View>
               </Touchable>
@@ -240,7 +240,7 @@ export function LandingPage() {
               </Touchable>
             </View>
             <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 10 }}>
-              $10/mo or $50/yr after your trial · cancel anytime
+              Free, forever · no credit card required
             </Text>
           </View>
 
@@ -286,7 +286,7 @@ export function LandingPage() {
           <Chip label="OFFLINE-FIRST" tone="neutral" />
           <Chip label="CLOUD SYNC" tone="neutral" />
           <Chip label="ROW-LEVEL SECURITY" tone="neutral" />
-          <Chip label="7-DAY FREE TRIAL" tone="neutral" />
+          <Chip label="FREE FOREVER" tone="neutral" />
         </View>
 
         {/* Features */}
@@ -376,87 +376,39 @@ export function LandingPage() {
         <View style={{ marginBottom: 56, alignItems: 'center' }}>
           <SectionHeader
             eyebrow="PRICING"
-            title="Everything included, either way."
-            subtitle="No free tier, no feature paywalls buried inside the app — just a 7-day trial to make sure it's for you."
+            title="Free. No catch."
+            subtitle="No trial, no feature paywalls buried inside the app, no credit card to sign up. If it's useful to you, there's an optional way to help cover hosting costs later — never required."
           />
-          <View
-            style={{
-              flexDirection: isWide ? 'row' : 'column',
-              gap: 16,
-              width: '100%',
-              maxWidth: isWide ? 720 : 380,
-              alignItems: isWide ? 'flex-end' : 'stretch',
-            }}>
-            {(
-              [
-                { key: 'monthly', price: '$10', per: '/month', badge: null, sub: 'Billed every month' },
-                {
-                  key: 'annual',
-                  price: '$50',
-                  per: '/year',
-                  badge: 'Best value · save 58%',
-                  sub: 'Billed once a year',
-                },
-              ] as const
-            ).map((plan) => (
-              <Card
-                key={plan.key}
-                style={{
-                  flex: 1,
-                  borderColor: plan.key === 'annual' ? t.primary : t.border,
-                  borderWidth: plan.key === 'annual' ? 2 : 1,
-                  alignItems: 'center',
-                  paddingVertical: 28,
-                }}>
-                {plan.badge ? <Chip label={plan.badge} tone="sage" /> : null}
-                <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text, marginTop: plan.badge ? 10 : 0 }}>
-                  GearPro Pro
+          <View style={{ width: '100%', maxWidth: 380 }}>
+            <Card style={{ alignItems: 'center', paddingVertical: 28, borderColor: t.primary, borderWidth: 2 }}>
+              <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.text }}>GearPro</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginTop: 8 }}>
+                <Text style={{ fontFamily: font.extrabold, fontSize: 40, color: t.text }}>$0</Text>
+                <Text style={{ fontFamily: font.medium, fontSize: 14, color: t.textMuted, marginBottom: 8 }}>
+                  forever
                 </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginTop: 8 }}>
-                  <Text style={{ fontFamily: font.extrabold, fontSize: 40, color: t.text }}>{plan.price}</Text>
-                  <Text style={{ fontFamily: font.medium, fontSize: 14, color: t.textMuted, marginBottom: 8 }}>
-                    {plan.per}
-                  </Text>
-                </View>
-                <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 4 }}>
-                  {plan.sub} · 7-day free trial
-                </Text>
+              </View>
 
-                <View style={{ width: '100%', gap: 10, marginTop: 22, marginBottom: 22 }}>
-                  {[
-                    'Unlimited trips & gear',
-                    'Cloud sync across every device',
-                    'Works fully offline',
-                    'Weight tracking & check-in / check-out',
-                    'Cancel anytime from the app',
-                  ].map((line) => (
-                    <View key={line} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Ionicons name="checkmark-circle" size={16} color={t.primary} />
-                      <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.text }}>{line}</Text>
-                    </View>
-                  ))}
-                </View>
-
-                <Touchable onPress={() => router.push('/signup')} style={{ width: '100%' }}>
-                  <View
-                    style={{
-                      backgroundColor: plan.key === 'annual' ? t.primary : t.soft,
-                      borderRadius: 14,
-                      paddingVertical: 15,
-                      alignItems: 'center',
-                    }}>
-                    <Text
-                      style={{
-                        fontFamily: font.bold,
-                        fontSize: 15,
-                        color: plan.key === 'annual' ? t.onPrimary : t.softText,
-                      }}>
-                      Start your free trial
-                    </Text>
+              <View style={{ width: '100%', gap: 10, marginTop: 22, marginBottom: 22 }}>
+                {[
+                  'Unlimited trips & gear',
+                  'Cloud sync across every device',
+                  'Works fully offline',
+                  'Weight tracking & check-in / check-out',
+                ].map((line) => (
+                  <View key={line} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="checkmark-circle" size={16} color={t.primary} />
+                    <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.text }}>{line}</Text>
                   </View>
-                </Touchable>
-              </Card>
-            ))}
+                ))}
+              </View>
+
+              <Touchable onPress={() => router.push('/signup')} style={{ width: '100%' }}>
+                <View style={{ backgroundColor: t.primary, borderRadius: 14, paddingVertical: 15, alignItems: 'center' }}>
+                  <Text style={{ fontFamily: font.bold, fontSize: 15, color: t.onPrimary }}>Sign up free</Text>
+                </View>
+              </Touchable>
+            </Card>
           </View>
         </View>
 
@@ -487,12 +439,12 @@ export function LandingPage() {
           <Touchable onPress={() => router.push('/signup')} style={{ marginTop: 20 }}>
             <View style={{ backgroundColor: t.primary, borderRadius: 14, paddingHorizontal: 26, paddingVertical: 15 }}>
               <Text style={{ fontFamily: font.bold, fontSize: 16, color: t.onPrimary }}>
-                Start 7-day free trial
+                Get started — it&apos;s free
               </Text>
             </View>
           </Touchable>
           <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.softText, marginTop: 12 }}>
-            $10/mo or $50/yr after trial · cancel anytime
+            Free, forever · no credit card required
           </Text>
         </View>
 
@@ -515,7 +467,7 @@ export function LandingPage() {
             <View style={{ flex: 1, gap: 8 }}>
               <Eyebrow>PRODUCT</Eyebrow>
               <Touchable onPress={() => router.push('/signup')}>
-                <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted }}>Start free trial</Text>
+                <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted }}>Sign up free</Text>
               </Touchable>
               <Touchable onPress={() => router.push('/login')}>
                 <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted }}>Sign in</Text>
@@ -523,7 +475,9 @@ export function LandingPage() {
             </View>
             <View style={{ flex: 1, gap: 8 }}>
               <Eyebrow>COMPANY</Eyebrow>
-              <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted }}>Built by Hevel Group</Text>
+              <Touchable onPress={() => Linking.openURL('https://hevelgroup.com')}>
+                <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted }}>Built by Hevel Group</Text>
+              </Touchable>
             </View>
             <View style={{ flex: 1, gap: 8 }}>
               <Eyebrow>LEGAL</Eyebrow>
@@ -535,10 +489,15 @@ export function LandingPage() {
               </Touchable>
             </View>
           </View>
-          <View style={{ marginTop: 24 }}>
+          <View style={{ marginTop: 24, flexDirection: 'row', gap: 4 }}>
             <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>
-              © {new Date().getFullYear()} Gear Pro · Built by Hevel Group
+              © {new Date().getFullYear()} Gear Pro · Built by
             </Text>
+            <Touchable onPress={() => Linking.openURL('https://hevelgroup.com')}>
+              <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, textDecorationLine: 'underline' }}>
+                Hevel Group
+              </Text>
+            </Touchable>
           </View>
         </View>
       </View>

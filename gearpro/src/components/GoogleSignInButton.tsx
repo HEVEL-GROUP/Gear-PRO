@@ -5,7 +5,19 @@ import { Pressable, Text, View } from 'react-native';
 import { signInWithGoogle } from '@/lib/auth/googleSignIn';
 import { font, useTheme } from '@/theme/tokens';
 
-export function GoogleSignInButton({ onError }: { onError: (message: string) => void }) {
+export function GoogleSignInButton({
+  onError,
+  blocked,
+  blockedMessage,
+}: {
+  onError: (message: string) => void;
+  /** When set, pressing the button reports blockedMessage instead of
+   * starting the OAuth flow -- e.g. signup requiring the terms checkbox
+   * first. Login has no such gate, so both props are optional and unused
+   * there. */
+  blocked?: boolean;
+  blockedMessage?: string;
+}) {
   const t = useTheme();
   const [submitting, setSubmitting] = useState(false);
 
@@ -13,6 +25,10 @@ export function GoogleSignInButton({ onError }: { onError: (message: string) => 
     <Pressable
       disabled={submitting}
       onPress={async () => {
+        if (blocked) {
+          onError(blockedMessage ?? 'Please try again.');
+          return;
+        }
         setSubmitting(true);
         const error = await signInWithGoogle();
         if (error) {

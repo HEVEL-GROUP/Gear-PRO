@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { type Href, Redirect, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -20,6 +21,7 @@ export default function SignupScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [checkEmail, setCheckEmail] = useState(false);
@@ -34,6 +36,10 @@ export default function SignupScreen() {
   const onSubmit = async () => {
     if (submitting) return;
     setError('');
+    if (!agreed) {
+      setError('Please agree to the Terms of Service and Privacy Policy first.');
+      return;
+    }
     if (!isValidEmail(email)) {
       setError('Enter a valid email address.');
       return;
@@ -105,7 +111,11 @@ export default function SignupScreen() {
         </Text>
       </View>
 
-      <GoogleSignInButton onError={setError} />
+      <GoogleSignInButton
+        onError={setError}
+        blocked={!agreed}
+        blockedMessage="Please agree to the Terms of Service and Privacy Policy first."
+      />
       <AuthDivider />
 
       <Field
@@ -127,6 +137,27 @@ export default function SignupScreen() {
         autoComplete="password"
       />
 
+      <Pressable
+        onPress={() => setAgreed((a) => !a)}
+        style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 4, marginBottom: 16 }}>
+        <Ionicons
+          name={agreed ? 'checkbox' : 'square-outline'}
+          size={20}
+          color={agreed ? t.primary : t.textMuted}
+          style={{ marginTop: 1 }}
+        />
+        <Text style={{ flex: 1, fontFamily: font.medium, fontSize: 13, color: t.textMuted, lineHeight: 19 }}>
+          I agree to the{' '}
+          <Text onPress={() => router.push('/terms')} style={{ color: t.primary, fontFamily: font.bold }}>
+            Terms of Service
+          </Text>{' '}
+          and{' '}
+          <Text onPress={() => router.push('/privacy')} style={{ color: t.primary, fontFamily: font.bold }}>
+            Privacy Policy
+          </Text>
+        </Text>
+      </Pressable>
+
       {error ? (
         <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.alert, marginBottom: 10 }}>{error}</Text>
       ) : null}
@@ -137,15 +168,6 @@ export default function SignupScreen() {
         <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.textMuted }}>Already have an account?</Text>
         <Pressable onPress={() => router.push('/login')}>
           <Text style={{ fontFamily: font.bold, fontSize: 13, color: t.primary }}>Log in</Text>
-        </Pressable>
-      </View>
-      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 14 }}>
-        <Pressable onPress={() => router.push('/terms')}>
-          <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>Terms of Service</Text>
-        </Pressable>
-        <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>·</Text>
-        <Pressable onPress={() => router.push('/privacy')}>
-          <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>Privacy Policy</Text>
         </Pressable>
       </View>
     </Screen>
