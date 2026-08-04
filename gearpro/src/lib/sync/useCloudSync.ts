@@ -176,7 +176,12 @@ export function useCloudSync() {
         // unblock rendering rather than hang on it forever.
         setReady(true);
         storeUnsub.current = useGearStore.subscribe((state, prev) => {
-          if (state.gear === prev.gear && state.trips === prev.trips) return;
+          if (
+            state.gear === prev.gear &&
+            state.trips === prev.trips &&
+            state.customCategories === prev.customCategories
+          )
+            return;
           // This change came from a remote pull, not a user edit -- don't treat
           // it as dirty (which would push it straight back and loop).
           if (applyingRemote.current) return;

@@ -10,8 +10,15 @@ jest.mock('@/lib/supabase/client', () => ({
 }));
 
 import { fakeSupabase, resetFakeSupabase } from './fakeSupabase';
-import { ensureLocalOwnedBy, pullFromCloud, pushToCloud, syncOnLogin } from './index';
-import { hashGear, uid, useGearStore } from '@/store/useGearStore';
+import {
+  ensureLocalOwnedBy,
+  pullCategoriesFromCloud,
+  pullFromCloud,
+  pushCategoriesToCloud,
+  pushToCloud,
+  syncOnLogin,
+} from './index';
+import { CATEGORIES, hashGear, uid, useGearStore } from '@/store/useGearStore';
 
 const USER = 'aaaaaaaa-0000-0000-0000-000000000001';
 const OTHER_USER = 'bbbbbbbb-0000-0000-0000-000000000002';
@@ -294,5 +301,70 @@ describe('ensureLocalOwnedBy', () => {
     ensureLocalOwnedBy(USER);
 
     expect(useGearStore.getState().gear).toBe(before);
+  });
+});
+
+describe('gear category sync', () => {
+  it('CRITICAL: pulls custom categories a different device created, into a device that has never seen them (the exact bug reported: categories "disappeared" on a fresh browser/device)', async () => {
+    fakeSupabase.seed('gear_category_prefs', [
+      { user_id: USER, custom_categories: ['Game Calls', 'Storage'] },
+    ]);
+    // This device has never created any custom category of its own.
+    useGearStore.setState({ categories: CATEGORIES, customCategories: [] });
+
+    await pullCategoriesFromCloud(USER);
+
+    expect(useGearStore.getState().customCategories).toEqual(['Game Calls', 'Storage']);
+    expect(useGearStore.getState().categories).toEqual([...CATEGORIES, 'Game Calls', 'Storage']);
+  });
+
+  it('unions cloud and local rather than replacing, so neither side can silently lose a category the other doesn\'t know about yet', async () => {
+    fakeSupabase.seed('gear_category_prefs', [{ user_id: USER, custom_categories: ['Storage'] }]);
+    useGearStore.setState({ categories: [...CATEGORIES, 'Game Calls'], customCategories: ['Game Calls'] });
+
+    await pullCategoriesFromCloud(USER);
+
+    expect(useGearStore.getState().customCategories).toEqual(['Storage', 'Game Calls']);
+    // The union is also written back, so the cloud converges on the same superset.
+    const row = fakeSupabase.tables.gear_category_prefs.get(USER);
+    expect(row?.custom_categories).toEqual(['Storage', 'Game Calls']);
+  });
+
+  it('is a no-op (no redundant push) once local already matches the cloud', async () => {
+    fakeSupabase.seed('gear_category_prefs', [{ user_id: USER, custom_categories: ['Storage'] }]);
+    useGearStore.setState({ categories: [...CATEGORIES, 'Storage'], customCategories: ['Storage'] });
+
+    await pullCategoriesFromCloud(USER);
+
+    expect(fakeSupabase.calls.upserts.filter((c) => c.table === 'gear_category_prefs')).toHaveLength(0);
+  });
+
+  it('pushCategoriesToCloud upserts the current local list under this user id', async () => {
+    useGearStore.setState({ customCategories: ['Game Calls', 'Storage'] });
+
+    await pushCategoriesToCloud(USER);
+
+    const row = fakeSupabase.tables.gear_category_prefs.get(USER);
+    expect(row?.custom_categories).toEqual(['Game Calls', 'Storage']);
+  });
+
+  it('pushToCloud also carries custom categories along on the same push', async () => {
+    useGearStore.setState({ customCategories: ['Storage'], gear: [], trips: [] });
+
+    await pushToCloud(USER);
+
+    const row = fakeSupabase.tables.gear_category_prefs.get(USER);
+    expect(row?.custom_categories).toEqual(['Storage']);
+  });
+
+  it('syncOnLogin pulls categories AFTER seeding demo data for a genuinely new account, so the seed reset never clobbers a category list pulled from the cloud', async () => {
+    // Cloud has real categories from another device, but no gear/trips yet
+    // (e.g. this account only ever managed categories, or a partial prior sync).
+    fakeSupabase.seed('gear_category_prefs', [{ user_id: USER, custom_categories: ['Game Calls'] }]);
+    useGearStore.setState({ gear: [], trips: [], categories: CATEGORIES, customCategories: [] });
+
+    await syncOnLogin(USER);
+
+    expect(useGearStore.getState().customCategories).toEqual(['Game Calls']);
   });
 });

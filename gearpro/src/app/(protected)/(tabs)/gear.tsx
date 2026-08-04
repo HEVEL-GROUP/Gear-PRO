@@ -181,6 +181,7 @@ export default function GearScreen() {
                 <Text style={{ fontFamily: font.semibold, fontSize: 12, color: t.textMuted }}>
                   {g.weightLb.toFixed(2)} lb · qty {g.quantity}
                 </Text>
+                {g.isDemo ? <Chip label="Demo" tone="alert" /> : null}
                 {isExpiredDate(g.expiration, today) ? <Chip label="Expired" tone="alert" /> : null}
                 {selectMode && inUse ? <Chip label="Packed" tone="neutral" /> : null}
               </View>
