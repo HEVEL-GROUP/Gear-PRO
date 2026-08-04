@@ -38,6 +38,7 @@ const blank = {
   quantity: '1',
   notes: '',
   expiration: '',
+  emoji: '',
   catalogProductId: null as string | null,
 };
 
@@ -148,6 +149,7 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
             quantity: String(editing.quantity),
             notes: editing.notes ?? '',
             expiration: editing.expiration ?? '',
+            emoji: editing.emoji ?? '',
             catalogProductId: editing.catalogProductId ?? null,
           }
         : blank,
@@ -177,6 +179,7 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
       quantity: Math.round(quantity),
       notes: form.notes.trim() || undefined,
       expiration: form.expiration.trim() || undefined,
+      emoji: form.emoji.trim() || undefined,
       catalogProductId: form.catalogProductId ?? undefined,
     };
     if (editing) updateGear(editing.id, payload);
@@ -299,6 +302,29 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
         onChange={(v) => setForm((f) => ({ ...f, category: v }))}
         onAddCustom={addCategory}
       />
+
+      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+        <View style={{ flex: 1 }}>
+          <Field
+            label="Emoji (optional)"
+            value={form.emoji}
+            onChangeText={(v) => setForm((f) => ({ ...f, emoji: v }))}
+            placeholder="🎒"
+          />
+        </View>
+        <View
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 12,
+            marginTop: 22,
+            backgroundColor: t.soft,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Text style={{ fontSize: 22 }}>{form.emoji || '🏷️'}</Text>
+        </View>
+      </View>
 
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1 }}>

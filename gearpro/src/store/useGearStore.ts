@@ -20,6 +20,11 @@ export type GearItem = {
   notes?: string;
   expiration?: string;
   photoUri?: string;
+  // Shown in the gear-row thumbnail in place of the generic placeholder icon
+  // when there's no photoUri -- a single emoji, entered via the device's own
+  // emoji keyboard rather than a picker grid this app would have to build
+  // and maintain.
+  emoji?: string;
   // Set once, at creation, when this item was matched to a catalog product
   // via the Add Gear suggestion picker. Persisted (not re-derived) because
   // suggestions deliberately don't reappear once editing an existing item --
@@ -183,7 +188,10 @@ function addPendingDeletes(current: PendingDeletes, adds: Partial<PendingDeletes
 // actually matches -- a mismatched normalization here would make a row look
 // permanently "dirty" and re-push every cycle forever.
 export function hashGear(
-  g: Pick<GearItem, 'brand' | 'name' | 'category' | 'weightLb' | 'quantity' | 'notes' | 'expiration' | 'photoUri' | 'catalogProductId'>,
+  g: Pick<
+    GearItem,
+    'brand' | 'name' | 'category' | 'weightLb' | 'quantity' | 'notes' | 'expiration' | 'photoUri' | 'emoji' | 'catalogProductId'
+  >,
 ): string {
   return JSON.stringify([
     g.brand ?? '',
@@ -194,6 +202,7 @@ export function hashGear(
     g.notes ?? '',
     g.expiration ?? '',
     g.photoUri ?? '',
+    g.emoji ?? '',
     g.catalogProductId ?? '',
   ]);
 }

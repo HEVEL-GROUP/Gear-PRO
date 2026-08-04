@@ -170,7 +170,11 @@ export default function GearScreen() {
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
-                <Ionicons name="image-outline" size={22} color={t.softText} />
+                {g.emoji ? (
+                  <Text style={{ fontSize: 26 }}>{g.emoji}</Text>
+                ) : (
+                  <Ionicons name="image-outline" size={22} color={t.softText} />
+                )}
               </View>
             )}
             <View style={{ flex: 1 }}>
