@@ -5,6 +5,7 @@ import { Keyboard, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Button, ChipPicker, Field, Label, Sheet } from '@/components/form';
 import { DatePickerSheet } from '@/components/DatePickerSheet';
+import { EmojiPickerSheet } from '@/components/EmojiPickerSheet';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { type CatalogSuggestion, MIN_QUERY_LENGTH, searchCatalogProducts } from '@/lib/catalog/searchCatalog';
 import { submitCatalogWeight } from '@/lib/catalog/submitWeight';
@@ -72,6 +73,7 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
   const [error, setError] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<CatalogSuggestion[]>([]);
   const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -303,28 +305,37 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
         onAddCustom={addCategory}
       />
 
-      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-        <View style={{ flex: 1 }}>
-          <Field
-            label="Emoji (optional)"
-            value={form.emoji}
-            onChangeText={(v) => setForm((f) => ({ ...f, emoji: v }))}
-            placeholder="🎒"
-          />
-        </View>
+      <Label>Emoji (optional)</Label>
+      <Pressable onPress={() => setEmojiPickerOpen(true)} style={{ marginBottom: 18 }}>
         <View
           style={{
-            width: 48,
-            height: 48,
-            borderRadius: 12,
-            marginTop: 22,
-            backgroundColor: t.soft,
+            flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'center',
+            gap: 12,
+            backgroundColor: t.surface,
+            borderWidth: 1,
+            borderColor: t.border,
+            borderRadius: 12,
+            paddingHorizontal: 14,
+            height: 48,
           }}>
-          <Text style={{ fontSize: 22 }}>{form.emoji || '🏷️'}</Text>
+          <View
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              backgroundColor: t.soft,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Text style={{ fontSize: 16 }}>{form.emoji || '🏷️'}</Text>
+          </View>
+          <Text style={{ flex: 1, fontFamily: font.medium, fontSize: 15, color: form.emoji ? t.text : t.textMuted }}>
+            {form.emoji ? 'Tap to change' : 'Tap to pick an emoji'}
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
         </View>
-      </View>
+      </Pressable>
 
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1 }}>
@@ -428,6 +439,13 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
         title="Expiration date"
         onChange={(v) => setForm((f) => ({ ...f, expiration: v }))}
         onClose={() => setDatePickerOpen(false)}
+      />
+      <EmojiPickerSheet
+        visible={emojiPickerOpen}
+        hasEmoji={!!form.emoji}
+        onSelect={(e) => setForm((f) => ({ ...f, emoji: e }))}
+        onClear={() => setForm((f) => ({ ...f, emoji: '' }))}
+        onClose={() => setEmojiPickerOpen(false)}
       />
     </Sheet>
   );
