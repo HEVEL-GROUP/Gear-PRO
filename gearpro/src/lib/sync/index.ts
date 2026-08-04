@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase/client';
 import {
   Assignment,
   Bag,
+  CATEGORIES,
   emptyPendingDeletes,
   GearItem,
   hashAssignment,
@@ -64,6 +65,71 @@ function toAssignmentRow(userId: string, tripId: string, a: Assignment) {
   };
 }
 
+const normalizeCategoryList = (list: string[]): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of list) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+  }
+  return out;
+};
+
+const sameList = (a: string[], b: string[]): boolean =>
+  a.length === b.length && a.every((v, i) => v === b[i]);
+
+/**
+ * Custom category NAMES get their own tiny per-user row (gear_category_prefs)
+ * rather than the per-row baseline/tombstone machinery gear/trips use below --
+ * a short name list carries none of that data's loss risk. Pushes the
+ * CURRENT full local list; called from pushToCloud so it rides the same
+ * debounced push cycle as everything else.
+ */
+export async function pushCategoriesToCloud(userId: string): Promise<void> {
+  const { customCategories } = useGearStore.getState();
+  const { error } = await supabase
+    .from('gear_category_prefs')
+    .upsert([{ user_id: userId, custom_categories: customCategories }]);
+  if (error) throw error;
+}
+
+/**
+ * Merges the cloud's custom category list into local by UNION, never a
+ * replace. Unlike gear/trips (per-row hash vs. baseline tells you when local
+ * has genuinely diverged), a name list has no cheap equivalent signal -- so
+ * instead of guessing which side is "newer," this just keeps every name
+ * either side has ever seen. That's what fixes the actual bug: a device that
+ * has never built up its own local copy started from an empty list and the
+ * custom categories a user created elsewhere looked gone, even though the
+ * gear items using them were untouched (gear syncs its category string
+ * regardless). The one downside -- a just-deleted/renamed category can
+ * reappear on a device that hasn't caught up yet -- is a one-tap fix, not
+ * silent data loss.
+ */
+export async function pullCategoriesFromCloud(userId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from('gear_category_prefs')
+    .select('custom_categories')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw error;
+
+  const cloudList = data?.custom_categories ?? [];
+  const localList = useGearStore.getState().customCategories;
+  const merged = normalizeCategoryList([...cloudList, ...localList]);
+
+  if (!sameList(merged, localList)) {
+    useGearStore.setState({ categories: [...CATEGORIES, ...merged], customCategories: merged });
+  }
+  if (!sameList(merged, cloudList)) {
+    await pushCategoriesToCloud(userId);
+  }
+}
+
 /**
  * Pushes ONLY what changed since the last confirmed sync -- never a wholesale
  * account mirror. Two things make this safe against ever destroying another
@@ -91,6 +157,17 @@ function toAssignmentRow(userId: string, tripId: string, a: Assignment) {
  * already synced). On success, records exactly what was confirmed sent.
  */
 export async function pushToCloud(userId: string): Promise<void> {
+  // Independent of the gear/trip tables below (its own row, no baseline/FK
+  // relationship to any of them) -- rides this same debounced push cycle
+  // purely so a category rename/add/remove doesn't need its own separate
+  // scheduling path. Best-effort: must never abort the gear/trip push below,
+  // which is what pushToCloud's callers actually depend on succeeding.
+  try {
+    await pushCategoriesToCloud(userId);
+  } catch (err) {
+    console.warn('[sync] categories push failed', err);
+  }
+
   const s = useGearStore.getState();
   const mine = (ownerId?: string) => !ownerId || ownerId === userId;
 
@@ -523,11 +600,23 @@ export async function syncOnLogin(userId: string): Promise<void> {
     const cur = useGearStore.getState();
     const hasRealContent = cur.gear.some((it) => !it.isDemo) || cur.trips.some((t) => !t.isDemo);
     if (!hasRealContent) useGearStore.getState().seedDemoData();
-    await pushToCloud(userId);
   } else {
     await pullFromCloud(userId);
-    await pushToCloud(userId);
   }
+  // Runs AFTER seedDemoData() above (so its customCategories reset can never
+  // clobber what this pulls down) but BEFORE the push below (so an account
+  // whose gear/trips are empty but which already has real cloud categories --
+  // e.g. this is the very first sync since those categories were created --
+  // never has them overwritten by this device's un-merged local list before
+  // it's even seen the cloud's copy). Best-effort: a failure here (e.g.
+  // offline) must never stop the more important gear/trip sync from
+  // finalizing below.
+  try {
+    await pullCategoriesFromCloud(userId);
+  } catch (err) {
+    console.warn('[sync] categories pull failed', err);
+  }
+  await pushToCloud(userId);
   useGearStore.getState().setSyncDirty(false);
   useGearStore.getState().setSyncedForUserId(userId);
 }

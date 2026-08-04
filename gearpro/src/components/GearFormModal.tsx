@@ -33,7 +33,8 @@ const blank = {
   brand: '',
   name: '',
   category: 'Shelter',
-  weight: '',
+  weightLb: '',
+  weightOz: '',
   quantity: '1',
   notes: '',
   expiration: '',
@@ -41,6 +42,18 @@ const blank = {
 };
 
 const isValidDate = (s: string) => s === '' || /^\d{4}-\d{2}-\d{2}$/.test(s.trim());
+
+// weightLb/weightOz are two halves of one physical weight -- oz is always
+// < 16 (a full pound rolls into the lb side) so the two fields never
+// disagree about how heavy the item actually is.
+const combineWeight = (lbStr: string, ozStr: string): number =>
+  (Number(lbStr) || 0) + (Number(ozStr) || 0) / 16;
+
+const splitWeight = (totalLb: number): { weightLb: string; weightOz: string } => {
+  const lb = Math.floor(totalLb);
+  const oz = Math.round((totalLb - lb) * 16 * 100) / 100;
+  return { weightLb: String(lb), weightOz: oz > 0 ? String(oz) : '' };
+};
 
 export function GearFormModal({ visible, onClose, editId, notice }: Props) {
   const t = useTheme();
@@ -104,12 +117,14 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
   const applySuggestion = (s: CatalogSuggestion) => {
     tapLight();
     Keyboard.dismiss();
+    const weightSplit = s.weightLb != null ? splitWeight(s.weightLb) : null;
     setForm((f) => ({
       ...f,
       brand: s.brand || f.brand,
       name: s.name,
       category: categories.includes(s.category) ? s.category : f.category,
-      weight: s.weightLb != null ? String(s.weightLb) : f.weight,
+      weightLb: weightSplit?.weightLb ?? f.weightLb,
+      weightOz: weightSplit?.weightOz ?? f.weightOz,
       catalogProductId: s.id,
     }));
     setSuggestions([]);
@@ -129,7 +144,7 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
             brand: editing.brand,
             name: editing.name,
             category: editing.category,
-            weight: String(editing.weightLb),
+            ...splitWeight(editing.weightLb),
             quantity: String(editing.quantity),
             notes: editing.notes ?? '',
             expiration: editing.expiration ?? '',
@@ -144,7 +159,7 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
     : false;
 
   const save = () => {
-    const weight = Number(form.weight);
+    const weight = combineWeight(form.weightLb, form.weightOz);
     const quantity = Number(form.quantity);
     if (!form.brand.trim() || !form.name.trim() || !(weight > 0) || !(quantity >= 1)) {
       setError('Add a brand, name, a weight above 0, and quantity of at least 1.');
@@ -287,12 +302,20 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
 
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1 }}>
-          <Field label="Weight (lb)" value={form.weight} onChangeText={(v) => setForm((f) => ({ ...f, weight: v }))} placeholder="0.0" keyboardType="decimal-pad" />
+          <Field label="Weight (lb)" value={form.weightLb} onChangeText={(v) => setForm((f) => ({ ...f, weightLb: v }))} placeholder="0" keyboardType="decimal-pad" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Field label="Weight (oz)" value={form.weightOz} onChangeText={(v) => setForm((f) => ({ ...f, weightOz: v }))} placeholder="0" keyboardType="decimal-pad" />
         </View>
         <View style={{ flex: 1 }}>
           <Field label="Owned qty" value={form.quantity} onChangeText={(v) => setForm((f) => ({ ...f, quantity: v }))} placeholder="1" keyboardType="number-pad" />
         </View>
       </View>
+      {form.weightLb || form.weightOz ? (
+        <Text style={{ fontFamily: font.semibold, fontSize: 12, color: t.textMuted, marginTop: -6, marginBottom: 14 }}>
+          Total: {combineWeight(form.weightLb, form.weightOz).toFixed(2)} lb
+        </Text>
+      ) : null}
 
       <Label>Expiration date (optional)</Label>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 }}>

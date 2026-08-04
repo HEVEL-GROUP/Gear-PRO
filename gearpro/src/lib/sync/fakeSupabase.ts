@@ -2,6 +2,7 @@
 // to faithfully support exactly the query shapes sync/index.ts issues:
 //   .from(t).select('*')
 //   .from(t).select('id', { count: 'exact', head: true }).eq(col, val)
+//   .from(t).select(cols).eq(col, val).maybeSingle()
 //   .from(t).upsert(rows)
 //   .from(t).update(patch).in('id', ids).eq(col, val)
 // Not a general Supabase mock -- just enough surface to exercise the real
@@ -12,7 +13,10 @@
 // idempotent) but must still count as a bug if it happens.
 
 type Row = Record<string, unknown>;
-export type FakeTables = Record<'gear_items' | 'trips' | 'bags' | 'assignments', Map<string, Row>>;
+export type FakeTables = Record<
+  'gear_items' | 'trips' | 'bags' | 'assignments' | 'gear_category_prefs',
+  Map<string, Row>
+>;
 
 export function createFakeSupabase() {
   const tables: FakeTables = {
@@ -20,6 +24,7 @@ export function createFakeSupabase() {
     trips: new Map(),
     bags: new Map(),
     assignments: new Map(),
+    gear_category_prefs: new Map(),
   };
   const calls = {
     upserts: [] as { table: string; rows: Row[] }[],
@@ -27,7 +32,7 @@ export function createFakeSupabase() {
   };
 
   function seed(table: keyof FakeTables, rows: Row[]) {
-    for (const r of rows) tables[table].set(r.id as string, { ...r });
+    for (const r of rows) tables[table].set((r.id ?? r.user_id) as string, { ...r });
   }
 
   function from(table: keyof FakeTables) {
@@ -40,16 +45,25 @@ export function createFakeSupabase() {
         }
         return {
           eq(col: string, val: unknown) {
-            const count = rowsArr().filter((r) => r[col] === val).length;
-            return Promise.resolve({ count, error: null, data: opts?.head ? null : undefined });
+            const matches = rowsArr().filter((r) => r[col] === val);
+            if (opts?.head) {
+              return Promise.resolve({ count: matches.length, error: null, data: null });
+            }
+            // Non-count selects (e.g. gear_category_prefs) always chain
+            // .maybeSingle() in the real code, so that's the only shape
+            // this branch needs to support.
+            return { maybeSingle: () => Promise.resolve({ data: matches[0] ?? null, error: null }) };
           },
         };
       },
       upsert(rows: Row[]) {
         calls.upserts.push({ table, rows: rows.map((r) => ({ ...r })) });
         for (const r of rows) {
-          const existing = tables[table].get(r.id as string) ?? {};
-          tables[table].set(r.id as string, { ...existing, ...r });
+          // gear_category_prefs has no `id` column -- its primary key is
+          // `user_id` (one row per user), same as the real migration.
+          const key = (r.id ?? r.user_id) as string;
+          const existing = tables[table].get(key) ?? {};
+          tables[table].set(key, { ...existing, ...r });
         }
         return Promise.resolve({ error: null });
       },
