@@ -15,6 +15,7 @@ import { tapLight } from '@/lib/haptics';
 import { font, radius, useTheme } from '@/theme/tokens';
 import {
   expiringGear,
+  filterGearInventory,
   flaggedAssignments,
   GearItem,
   groupByCategory,
@@ -72,14 +73,10 @@ export default function GearScreen() {
     return counts;
   }, [gear]);
 
-  const filtered = useMemo(() => {
-    const query = q.trim().toLowerCase();
-    let list = query
-      ? gear.filter((g) => `${g.brand} ${g.name} ${g.category}`.toLowerCase().includes(query))
-      : gear;
-    if (activeCategory) list = list.filter((g) => g.category === activeCategory);
-    return list;
-  }, [gear, q, activeCategory]);
+  const filtered = useMemo(
+    () => filterGearInventory(gear, { query: q, category: activeCategory }),
+    [gear, q, activeCategory],
+  );
 
   const groups = useMemo(
     () => groupByCategory(filtered, (g: GearItem) => g.category),

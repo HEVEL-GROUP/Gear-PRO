@@ -3,6 +3,8 @@ import {
   demoDataCounts,
   expiringGear,
   flaggedAssignments,
+  filterGearInventory,
+  gearMatchesQuery,
   groupByCategory,
   hashGear,
   packedCount,
@@ -17,8 +19,7 @@ const TODAY = '2026-07-23';
 // addGear (unlike addTrip) doesn't return the new id -- it always appends, so
 // the freshly-added item is reliably the last element right after the call.
 function addGearAndGetId(item: Parameters<ReturnType<typeof useGearStore.getState>['addGear']>[0]) {
-  useGearStore.getState().addGear(item);
-  return useGearStore.getState().gear.at(-1)!.id;
+  return useGearStore.getState().addGear(item);
 }
 
 describe('useGearStore', () => {
@@ -731,5 +732,29 @@ describe('sortTripsFeaturedFirst', () => {
 
     const sorted = sortTripsFeaturedFirst([closedOld, closedRecent], TODAY);
     expect(sorted.map((t) => t.name)).toEqual(['Recent', 'Old']);
+  });
+});
+
+describe('gear inventory search', () => {
+  const sample = [
+    { id: '1', brand: 'KUIU', name: 'Rain jacket', category: 'Clothing', weightLb: 1, quantity: 1 },
+    { id: '2', brand: 'MSR', name: 'Stove', category: 'Cooking', weightLb: 0.5, quantity: 1, notes: 'windscreen included' },
+    { id: '3', brand: 'Garmin', name: 'GPS', category: 'Navigation', weightLb: 0.3, quantity: 1 },
+  ];
+
+  it('matches name and brand', () => {
+    expect(gearMatchesQuery(sample[0], 'kuiu')).toBe(true);
+    expect(gearMatchesQuery(sample[0], 'rain')).toBe(true);
+    expect(gearMatchesQuery(sample[0], 'tent')).toBe(false);
+  });
+
+  it('matches notes when present', () => {
+    expect(gearMatchesQuery(sample[1], 'windscreen')).toBe(true);
+  });
+
+  it('filterGearInventory applies query and category together', () => {
+    expect(filterGearInventory(sample, { query: 'garmin', category: null })).toHaveLength(1);
+    expect(filterGearInventory(sample, { query: '', category: 'Cooking' })).toHaveLength(1);
+    expect(filterGearInventory(sample, { query: 'msr', category: 'Navigation' })).toHaveLength(0);
   });
 });

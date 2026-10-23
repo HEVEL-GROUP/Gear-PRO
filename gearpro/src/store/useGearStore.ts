@@ -143,6 +143,25 @@ export function groupByCategory<T>(
     .map((category) => ({ category, items: buckets.get(category)! }));
 }
 
+// Shared inventory search for the gear library and the trip-planning picker.
+export function gearMatchesQuery(item: GearItem, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const haystack = `${item.brand} ${item.name} ${item.notes ?? ''}`.toLowerCase();
+  return haystack.includes(q);
+}
+
+export function filterGearInventory(
+  gear: GearItem[],
+  options: { query?: string; category?: string | null },
+): GearItem[] {
+  let list = gear;
+  const query = options.query?.trim() ?? '';
+  if (query) list = list.filter((g) => gearMatchesQuery(g, query));
+  if (options.category) list = list.filter((g) => g.category === options.category);
+  return list;
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Real UUIDs so local ids can sync 1:1 with Postgres uuid columns. Falls back
@@ -340,7 +359,7 @@ type StoreState = {
   // this can never upload anything to the cloud.
   seedDemoData: () => void;
   resetLocal: () => void;
-  addGear: (item: Omit<GearItem, 'id'>) => void;
+  addGear: (item: Omit<GearItem, 'id'>) => string;
   updateGear: (id: string, patch: Partial<GearItem>) => void;
   removeGear: (id: string) => void;
   removeGearBulk: (ids: string[]) => void;
@@ -493,7 +512,11 @@ export const useGearStore = create<StoreState>()(
           localResetInProgress = false;
         }
       },
-      addGear: (item) => set((s) => ({ gear: [...s.gear, { ...item, id: uid() }] })),
+      addGear: (item) => {
+        const id = uid();
+        set((s) => ({ gear: [...s.gear, { ...item, id }] }));
+        return id;
+      },
       updateGear: (id, patch) =>
         set((s) => ({ gear: s.gear.map((it) => (it.id === id ? { ...it, ...patch } : it)) })),
       // Cascades to every trip's assignments so deleting gear never leaves an
