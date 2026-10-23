@@ -28,7 +28,14 @@ function fmtDate(s: string): string {
   return `${MONTHS_SHORT[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}`;
 }
 
-type Props = { visible: boolean; onClose: () => void; editId?: string | null; notice?: string };
+type Props = {
+  visible: boolean;
+  onClose: () => void;
+  editId?: string | null;
+  notice?: string;
+  /** Fired with the new gear id after a successful create (not on edit). */
+  onCreated?: (gearId: string) => void;
+};
 
 const blank = {
   brand: '',
@@ -57,7 +64,7 @@ const splitWeight = (totalLb: number): { weightLb: string; weightOz: string } =>
   return { weightLb: String(lb), weightOz: oz > 0 ? String(oz) : '' };
 };
 
-export function GearFormModal({ visible, onClose, editId, notice }: Props) {
+export function GearFormModal({ visible, onClose, editId, notice, onCreated }: Props) {
   const t = useTheme();
   const { session } = useAuth();
   const gear = useGearStore((s) => s.gear);
@@ -185,7 +192,7 @@ export function GearFormModal({ visible, onClose, editId, notice }: Props) {
       catalogProductId: form.catalogProductId ?? undefined,
     };
     if (editing) updateGear(editing.id, payload);
-    else addGear(payload);
+    else onCreated?.(addGear(payload));
     // Fire-and-forget, after the local save already succeeded -- the weight
     // the user just entered for their own gear doubles as a submission for
     // whichever catalog product this item is linked to (set once, at

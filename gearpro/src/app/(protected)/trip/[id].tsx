@@ -5,6 +5,7 @@ import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 
 import { BagFormSheet } from '@/components/BagFormSheet';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
+import { PlanGearPickerSheet } from '@/components/PlanGearPickerSheet';
 import { ShareTripSheet } from '@/components/ShareTripSheet';
 import { TripFormModal } from '@/components/TripFormModal';
 import { Button, Field, Sheet } from '@/components/form';
@@ -25,7 +26,6 @@ import {
   isExpiredDate,
   itemCount,
   packedCount,
-  remainingToAssign,
   RETURN_OUTCOME_STATUSES,
   STATUS_LABELS,
   STATUS_ORDER,
@@ -81,7 +81,6 @@ export default function TripDetail() {
   const trips = useGearStore((s) => s.trips);
   const gear = useGearStore((s) => s.gear);
   const sharedGearById = useGearStore((s) => s.sharedGearById);
-  const addAssignment = useGearStore((s) => s.addAssignment);
   const updateAssignment = useGearStore((s) => s.updateAssignment);
   const removeAssignment = useGearStore((s) => s.removeAssignment);
   const moveAssignment = useGearStore((s) => s.moveAssignment);
@@ -642,50 +641,15 @@ export default function TripDetail() {
         </>
       )}
 
-      <Sheet visible={!!assignBagId} onClose={() => setAssignBagId(null)} title="Add gear">
-        {groupByCategory(gear, (item) => item.category).map(({ category, items: catItems }) => (
-          <View key={category} style={{ marginBottom: 10 }}>
-            <RowGroupLabel>{category}</RowGroupLabel>
-            {catItems.map((item) => {
-              const inBag =
-                trip.assignments.find((a) => a.gearId === item.id && a.bagId === assignBagId)?.quantity ?? 0;
-              const remaining = remainingToAssign(item, trips, trip);
-              const expired = isExpiredDate(item.expiration, today);
-              const disabled = remaining <= 0;
-              return (
-                <Pressable
-                  key={item.id}
-                  disabled={disabled}
-                  onPress={() => {
-                    if (assignBagId && !disabled) {
-                      addAssignment(trip.id, assignBagId, item.id, 1);
-                      tapLight();
-                    }
-                  }}
-                  style={{ marginBottom: 8, opacity: disabled ? 0.5 : 1 }}>
-                  <Card style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontFamily: font.bold, fontSize: 14, color: t.text }}>
-                        {item.brand} {item.name}
-                      </Text>
-                      <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-                        {item.weightLb.toFixed(2)} lb · {remaining} left to pack
-                      </Text>
-                    </View>
-                    {expired ? <Chip label="Expired" tone="alert" /> : null}
-                    {inBag > 0 ? <Chip label={`In bag · ${inBag}`} tone="sage" /> : null}
-                    <Ionicons
-                      name={disabled ? 'lock-closed-outline' : 'add-circle'}
-                      size={26}
-                      color={disabled ? t.textMuted : t.primary}
-                    />
-                  </Card>
-                </Pressable>
-              );
-            })}
-          </View>
-        ))}
-      </Sheet>
+      {assignBagId ? (
+        <PlanGearPickerSheet
+          visible={!!assignBagId}
+          onClose={() => setAssignBagId(null)}
+          trip={trip}
+          bagId={assignBagId}
+          today={today}
+        />
+      ) : null}
 
       <Sheet
         visible={!!statusFor}
