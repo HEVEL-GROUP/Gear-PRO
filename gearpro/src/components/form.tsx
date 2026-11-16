@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { ReactNode, useState } from 'react';
 import {
+  KeyboardAvoidingView,
   KeyboardTypeOptions,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,58 +16,110 @@ import {
 
 import { Display } from '@/components/ui';
 import { tapLight } from '@/lib/haptics';
+import { sheetMaxHeightPx } from '@/lib/keyboardInset';
+import { useSheetKeyboard } from '@/lib/useSheetKeyboard';
 import { font, useTheme } from '@/theme/tokens';
+
+function scrollFocusedFieldIntoView(target: unknown) {
+  if (Platform.OS !== 'web' || !target || typeof target !== 'object') return;
+  const node = target as { scrollIntoView?: (opts?: ScrollIntoViewOptions) => void };
+  requestAnimationFrame(() => {
+    node.scrollIntoView?.({ block: 'center', inline: 'nearest' });
+  });
+}
 
 export function Sheet({
   visible,
   onClose,
   title,
   children,
+  footer,
 }: {
   visible: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  /** Stays pinned under the scrolling body, above the keyboard. */
+  footer?: ReactNode;
 }) {
   const t = useTheme();
   const { width } = useWindowDimensions();
   const isWide = width >= 640;
+  const { lift, layoutHeight } = useSheetKeyboard(visible);
+  const [headerHeight, setHeaderHeight] = useState(46);
+  const [measuredFooter, setMeasuredFooter] = useState(0);
+  const footerHeight = footer ? measuredFooter || 72 : 0;
+
+  const bottomPad = lift > 0 ? 12 : isWide ? 22 : 34;
+  const paddingTop = 18;
+  // onLayout reports the title row without its margin, which still occupies space.
+  const headerGap = 16;
+  const footerGap = footer ? 4 : 0;
+  const sheetMax = sheetMaxHeightPx(layoutHeight, lift, isWide);
+  const scrollMax = Math.max(
+    120,
+    sheetMax - paddingTop - bottomPad - headerHeight - headerGap - footerHeight - footerGap,
+  );
 
   return (
     <Modal visible={visible} transparent animationType={isWide ? 'fade' : 'slide'} onRequestClose={onClose}>
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: 'rgba(18,16,12,0.55)',
-          justifyContent: isWide ? 'center' : 'flex-end',
-          alignItems: isWide ? 'center' : 'stretch',
-        }}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        enabled={Platform.OS === 'ios' && lift === 0}>
         <View
           style={{
-            backgroundColor: t.bg,
-            borderTopLeftRadius: 26,
-            borderTopRightRadius: 26,
-            borderBottomLeftRadius: isWide ? 26 : 0,
-            borderBottomRightRadius: isWide ? 26 : 0,
-            paddingHorizontal: 20,
-            paddingTop: 18,
-            paddingBottom: isWide ? 22 : 34,
-            maxHeight: isWide ? '85%' : '90%',
-            width: isWide ? 520 : '100%',
-            maxWidth: isWide ? '92%' : undefined,
+            flex: 1,
+            backgroundColor: 'rgba(18,16,12,0.55)',
+            justifyContent: isWide ? 'center' : 'flex-end',
+            alignItems: isWide ? 'center' : 'stretch',
+            paddingBottom: lift,
           }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
-            <Display style={{ fontSize: 22, flex: 1 }}>{title}</Display>
-            <Pressable onPress={onClose} hitSlop={12}>
-              <Ionicons name="close" size={26} color={t.textMuted} />
-            </Pressable>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+          <View
+            style={{
+              backgroundColor: t.bg,
+              borderTopLeftRadius: 26,
+              borderTopRightRadius: 26,
+              borderBottomLeftRadius: isWide ? 26 : 0,
+              borderBottomRightRadius: isWide ? 26 : 0,
+              paddingHorizontal: 20,
+              paddingTop,
+              paddingBottom: bottomPad,
+              maxHeight: sheetMax,
+              width: isWide ? 520 : '100%',
+              maxWidth: isWide ? '92%' : undefined,
+            }}>
+            <View
+              onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
+              style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <Display style={{ fontSize: 22, flex: 1 }}>{title}</Display>
+              <Pressable onPress={onClose} hitSlop={12}>
+                <Ionicons name="close" size={26} color={t.textMuted} />
+              </Pressable>
+            </View>
+            <ScrollView
+              style={{ maxHeight: scrollMax, flexGrow: 0 }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag">
+              {children}
+            </ScrollView>
+            {footer ? (
+              <View
+                onLayout={(e) => setMeasuredFooter(e.nativeEvent.layout.height)}
+                style={{
+                  paddingTop: 12,
+                  borderTopWidth: 1,
+                  borderTopColor: t.border,
+                  marginTop: 4,
+                }}>
+                {footer}
+              </View>
+            ) : null}
           </View>
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {children}
-          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -115,6 +169,7 @@ export function Field({
       <TextInput
         value={value}
         onChangeText={onChangeText}
+        onFocus={(e) => scrollFocusedFieldIntoView(e.target)}
         placeholder={placeholder}
         placeholderTextColor={t.textMuted}
         keyboardType={keyboardType}

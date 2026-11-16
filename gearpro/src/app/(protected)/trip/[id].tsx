@@ -23,6 +23,7 @@ import {
   GearStatus,
   gearMap,
   groupByCategory,
+  lineWeightLb,
   isExpiredDate,
   itemCount,
   packedCount,
@@ -192,7 +193,7 @@ export default function TripDetail() {
   const bagWeight = (bagId: string) =>
     trip.assignments
       .filter((a) => a.bagId === bagId)
-      .reduce((sum, a) => sum + (byId[a.gearId]?.weightLb ?? 0) * a.quantity, 0);
+      .reduce((sum, a) => sum + lineWeightLb(byId[a.gearId]?.weightLb, a.quantity), 0);
 
   // Max this specific assignment can grow to, given what's packed elsewhere and owned in total.
   const maxQuantityFor = (assignment: (typeof trip.assignments)[number]) => {
@@ -217,7 +218,7 @@ export default function TripDetail() {
             {item ? `${item.brand} ${item.name}` : 'Unknown'}
           </Text>
           <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-            {((item?.weightLb ?? 0) * a.quantity).toFixed(2)} lb
+            {lineWeightLb(item?.weightLb, a.quantity).toFixed(2)} lb
           </Text>
           <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
             <Pressable
@@ -294,7 +295,7 @@ export default function TripDetail() {
               {item ? `${item.brand} ${item.name}` : 'Unknown'}
             </Text>
             <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-              {((item?.weightLb ?? 0) * a.quantity).toFixed(2)} lb
+              {lineWeightLb(item?.weightLb, a.quantity).toFixed(2)} lb
               {a.quantity > 1 ? ` · ×${a.quantity}` : ''}
             </Text>
           </View>
@@ -315,7 +316,7 @@ export default function TripDetail() {
             {item ? `${item.brand} ${item.name}` : 'Unknown'}
           </Text>
           <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-            {((item?.weightLb ?? 0) * a.quantity).toFixed(2)} lb{a.quantity > 1 ? ` · ×${a.quantity}` : ''}
+            {lineWeightLb(item?.weightLb, a.quantity).toFixed(2)} lb{a.quantity > 1 ? ` · ×${a.quantity}` : ''}
           </Text>
         </View>
         <Chip label={STATUS_LABELS[a.status]} tone={statusTone(a.status)} />

@@ -755,9 +755,23 @@ export function gearMap(gear: GearItem[]): Record<string, GearItem> {
   return Object.fromEntries(gear.map((it) => [it.id, it]));
 }
 
+// Missing, blank, or non-numeric weight counts as 0. gear_items.weight_lb is
+// NOT NULL DEFAULT 0, and pack math multiplies weight by quantity — a null or
+// NaN here would poison every total that includes the item.
+export function finiteWeightLb(weightLb: number | null | undefined): number {
+  const w = Number(weightLb);
+  return Number.isFinite(w) ? w : 0;
+}
+
+export function lineWeightLb(weightLb: number | null | undefined, quantity = 1): number {
+  const q = Number(quantity);
+  if (!Number.isFinite(q)) return 0;
+  return finiteWeightLb(weightLb) * q;
+}
+
 export function tripWeight(trip: Trip, byId: Record<string, GearItem>): number {
   return trip.assignments.reduce(
-    (sum, a) => sum + (byId[a.gearId]?.weightLb ?? 0) * a.quantity,
+    (sum, a) => sum + lineWeightLb(byId[a.gearId]?.weightLb, a.quantity),
     0,
   );
 }
@@ -770,7 +784,7 @@ export function categoryBreakdown(
   for (const a of trip.assignments) {
     const item = byId[a.gearId];
     if (!item) continue;
-    totals[item.category] = (totals[item.category] ?? 0) + item.weightLb * a.quantity;
+    totals[item.category] = (totals[item.category] ?? 0) + lineWeightLb(item.weightLb, a.quantity);
   }
   return Object.entries(totals)
     .map(([category, weight]) => ({ category, weight }))

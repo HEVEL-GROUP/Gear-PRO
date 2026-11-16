@@ -18,8 +18,10 @@ import {
   filterGearInventory,
   flaggedAssignments,
   GearItem,
+  finiteWeightLb,
   groupByCategory,
   isExpiredDate,
+  lineWeightLb,
   todayStamp,
   useGearStore,
 } from '@/store/useGearStore';
@@ -83,7 +85,7 @@ export default function GearScreen() {
     [filtered],
   );
 
-  const totalWeight = gear.reduce((s, g) => s + g.weightLb * g.quantity, 0);
+  const totalWeight = gear.reduce((s, g) => s + lineWeightLb(g.weightLb, g.quantity), 0);
 
   // The deletable gear currently in view (respects search + category filter,
   // excludes locked-in-use items) -- what "Select all" operates on.
@@ -180,7 +182,7 @@ export default function GearScreen() {
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
                 <Text style={{ fontFamily: font.semibold, fontSize: 12, color: t.textMuted }}>
-                  {g.weightLb.toFixed(2)} lb · qty {g.quantity}
+                  {finiteWeightLb(g.weightLb).toFixed(2)} lb · qty {g.quantity}
                 </Text>
                 {g.isDemo ? <Chip label="Demo" tone="alert" /> : null}
                 {isExpiredDate(g.expiration, today) ? <Chip label="Expired" tone="alert" /> : null}
@@ -415,7 +417,7 @@ export default function GearScreen() {
         </Text>
       ) : (
         groups.map(({ category, items }) => {
-          const catWeight = items.reduce((s, g) => s + g.weightLb * g.quantity, 0);
+          const catWeight = items.reduce((s, g) => s + lineWeightLb(g.weightLb, g.quantity), 0);
           return (
             <View key={category} style={{ marginBottom: 18 }}>
               <View
