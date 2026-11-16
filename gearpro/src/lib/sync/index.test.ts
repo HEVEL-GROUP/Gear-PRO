@@ -150,6 +150,49 @@ describe('pushToCloud -- delta push + soft delete', () => {
     expect(sentIds).not.toContain(cleanId);
   });
 
+  it('skips demo and local trips whose ids are not uuids, including a pending delete of elk and scout', async () => {
+    const realTripId = uid();
+    useGearStore.setState({
+      trips: [
+        {
+          id: 'elk',
+          name: 'Elk',
+          location: '',
+          startDate: '',
+          endDate: '',
+          bags: [],
+          assignments: [],
+          isDemo: true,
+        },
+        {
+          id: 'scout',
+          name: 'Scout',
+          location: '',
+          startDate: '',
+          endDate: '',
+          bags: [],
+          assignments: [],
+          isDemo: false,
+        },
+      ],
+      gear: [{ id: 'tent', brand: 'Hilleberg', name: 'Nallo', category: 'Shelter', weightLb: 1, quantity: 1, isDemo: false }],
+      pendingDeletes: { gear_items: ['tent'], trips: ['elk', 'scout', realTripId], bags: ['pack'], assignments: [] },
+    });
+
+    await pushToCloud(USER);
+
+    expect(fakeSupabase.calls.upserts.filter((c) => c.table === 'trips')).toHaveLength(0);
+    expect(fakeSupabase.calls.upserts.filter((c) => c.table === 'bags')).toHaveLength(0);
+    expect(fakeSupabase.calls.upserts.filter((c) => c.table === 'gear_items')).toHaveLength(0);
+    const tripDeletes = fakeSupabase.calls.softDeletes.filter((c) => c.table === 'trips');
+    expect(tripDeletes).toEqual([{ table: 'trips', ids: [realTripId] }]);
+    expect(fakeSupabase.calls.softDeletes.filter((c) => c.table === 'gear_items')).toHaveLength(0);
+    expect(fakeSupabase.calls.softDeletes.filter((c) => c.table === 'bags')).toHaveLength(0);
+    expect(useGearStore.getState().pendingDeletes.trips).toEqual([]);
+    expect(useGearStore.getState().pendingDeletes.gear_items).toEqual([]);
+    expect(useGearStore.getState().pendingDeletes.bags).toEqual([]);
+  });
+
   it('never uploads isDemo rows, even when syncDirty is true', async () => {
     useGearStore.setState({
       gear: [{ id: uid(), brand: 'Demo', name: 'Seed item', category: 'Shelter', weightLb: 1, quantity: 1, isDemo: true }],

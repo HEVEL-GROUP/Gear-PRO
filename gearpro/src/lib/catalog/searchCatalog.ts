@@ -1,3 +1,4 @@
+import { catalogSuggestionsFromRows } from '@/lib/catalog/catalogScore';
 import { supabase } from '@/lib/supabase/client';
 
 // Powers the "Add gear" autocomplete: as the user types a brand and/or item
@@ -16,7 +17,10 @@ import { supabase } from '@/lib/supabase/client';
 // to do with it, and a one-character brand ("Q") matched any product name
 // containing that letter. Trigram scoring fixes both -- verified against
 // real production gear data (a 119-item library): unrelated real item names
-// scored 0.000-0.065, genuine matches scored 0.12+.
+// scored 0.000-0.065, genuine matches scored 0.12+. The SQL function still
+// cuts off at 0.1 (no schema change). A real search for an item the catalog
+// doesn't have, such as "sea to sumit liner", still returned Sitka's
+// Timberline Jacket at 0.105. This client drops anything under 0.15.
 
 export type CatalogSuggestion = {
   id: string;
@@ -36,6 +40,24 @@ export type CatalogSuggestion = {
 // that out server-side.
 export const MIN_QUERY_LENGTH = 2;
 
+let catalogBrandCache: string[] | null = null;
+
+/** Distinct catalog brands, cached for the Add gear brand split. Empty on failure is the caller's job. */
+export async function loadCatalogBrands(): Promise<string[]> {
+  if (catalogBrandCache) return catalogBrandCache;
+  const { data, error } = await supabase.from('catalog_products').select('brand');
+  if (error) throw new Error(error.message);
+  const brands = [
+    ...new Set(
+      ((data ?? []) as { brand?: string | null }[])
+        .map((row) => (row.brand ?? '').trim())
+        .filter((brand) => brand.length > 0),
+    ),
+  ];
+  catalogBrandCache = brands;
+  return brands;
+}
+
 export async function searchCatalogProducts(query: string, limit = 8): Promise<CatalogSuggestion[]> {
   const q = query.trim();
   if (q.length < MIN_QUERY_LENGTH) return [];
@@ -43,12 +65,5 @@ export async function searchCatalogProducts(query: string, limit = 8): Promise<C
   const { data, error } = await supabase.rpc('search_catalog_products', { query: q, match_limit: limit });
 
   if (error) throw new Error(error.message);
-  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-    id: r.id as string,
-    brand: (r.brand as string) ?? '',
-    name: r.name as string,
-    category: r.category as string,
-    weightLb: (r.weight_lb as number | null) ?? null,
-    link: (r.affiliate_url as string | null) ?? (r.product_url as string | null) ?? null,
-  }));
+  return catalogSuggestionsFromRows((data ?? []) as Record<string, unknown>[]);
 }

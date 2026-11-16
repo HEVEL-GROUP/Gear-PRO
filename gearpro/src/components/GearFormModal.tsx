@@ -1,14 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useRef, useState } from 'react';
-import { Keyboard, Pressable, ScrollView, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { Button, ChipPicker, Field, Label, Sheet } from '@/components/form';
 import { DatePickerSheet } from '@/components/DatePickerSheet';
 import { EmojiPickerSheet } from '@/components/EmojiPickerSheet';
 import { useAuth } from '@/lib/auth/AuthProvider';
-import { type CatalogSuggestion, MIN_QUERY_LENGTH, searchCatalogProducts } from '@/lib/catalog/searchCatalog';
+import { type CatalogSuggestion, loadCatalogBrands, MIN_QUERY_LENGTH, searchCatalogProducts } from '@/lib/catalog/searchCatalog';
 import { submitCatalogWeight } from '@/lib/catalog/submitWeight';
+import { addTypedGearLabel, mergeBrandList, NO_CATALOG_MATCH, planTypedGear } from '@/lib/gearBrand';
 import { resolveWeightLb, splitWeight, validateGearDraft, weightFieldsFromCatalog } from '@/lib/gearForm';
 import { tapLight } from '@/lib/haptics';
 import { font, useTheme } from '@/theme/tokens';
@@ -71,7 +72,15 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
   const [suggestions, setSuggestions] = useState<CatalogSuggestion[]>([]);
   const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [catalogBrands, setCatalogBrands] = useState<string[]>([]);
+  const [fieldHint, setFieldHint] = useState('');
   const searchSeq = useRef(0);
+  const brandRef = useRef<TextInput>(null);
+  const nameRef = useRef<TextInput>(null);
+  const knownBrands = useMemo(
+    () => mergeBrandList(catalogBrands, gear.map((item) => item.brand)),
+    [catalogBrands, gear],
+  );
 
   // Debounced catalog search as the user types brand and/or item name --
   // 250ms so a fast typist doesn't fire a query per keystroke. searchSeq
@@ -98,8 +107,9 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
       return;
     }
     const seq = ++searchSeq.current;
+    setSearching(true);
+    setSuggestions([]);
     const timer = setTimeout(() => {
-      setSearching(true);
       searchCatalogProducts(combinedQuery, SUGGESTION_LIMIT)
         .catch(() => [])
         .then((results) => {
@@ -126,7 +136,21 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
     }));
     setSuggestions([]);
     setSuggestionsDismissed(true);
+    setFieldHint('');
   };
+
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    loadCatalogBrands()
+      .then((brands) => {
+        if (!cancelled) setCatalogBrands(brands);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -135,6 +159,7 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
     setSuggestions([]);
     setSuggestionsDismissed(false);
     setSearching(false);
+    setFieldHint('');
     setForm(
       editing
         ? {
@@ -156,23 +181,23 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
     ? trips.some((tr) => tr.assignments.some((a) => a.gearId === editing.id))
     : false;
 
-  const save = () => {
+  const save = (override?: { brand: string; name: string; quantity: string }) => {
     const result = validateGearDraft({
-      brand: form.brand,
-      name: form.name,
+      brand: override?.brand ?? form.brand,
+      name: override?.name ?? form.name,
       weightLb: form.weightLb,
       weightOz: form.weightOz,
-      quantity: form.quantity,
+      quantity: override?.quantity ?? form.quantity,
       expiration: form.expiration,
     });
     if (!result.ok) {
       setError(result.error);
       return;
     }
-    const { weightLb: weight, quantity } = result.value;
+    const { brand, name, weightLb: weight, quantity } = result.value;
     const payload = {
-      brand: form.brand.trim(),
-      name: form.name.trim(),
+      brand,
+      name,
       category: form.category,
       weightLb: weight,
       quantity,
@@ -193,6 +218,24 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
       submitCatalogWeight(session.user.id, form.catalogProductId, weight);
     }
     onClose();
+  };
+
+  const addTypedGear = () => {
+    tapLight();
+    const plan = planTypedGear(combinedQuery, knownBrands);
+    if (plan.kind === 'save') {
+      const quantity = '1';
+      setForm((f) => ({ ...f, brand: plan.brand, name: plan.name, quantity }));
+      setFieldHint('');
+      save({ brand: plan.brand, name: plan.name, quantity });
+      return;
+    }
+    setForm((f) => ({ ...f, brand: plan.brand, name: plan.name }));
+    setFieldHint(plan.hint);
+    setError('');
+    requestAnimationFrame(() => {
+      (plan.field === 'brand' ? brandRef : nameRef).current?.focus();
+    });
   };
 
   const resolvedWeight = resolveWeightLb(form.weightLb, form.weightOz);
@@ -230,25 +273,61 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
       ) : null}
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1 }}>
-          <Field label="Brand" value={form.brand} onChangeText={(v) => setForm((f) => ({ ...f, brand: v }))} placeholder="KUIU" />
+          <Field
+            label="Brand"
+            inputRef={brandRef}
+            value={form.brand}
+            onChangeText={(v) => {
+              setFieldHint('');
+              setForm((f) => ({ ...f, brand: v }));
+            }}
+            placeholder="KUIU"
+          />
         </View>
         <View style={{ flex: 1.4 }}>
-          <Field label="Item name" value={form.name} onChangeText={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="Super Down jacket" />
+          <Field
+            label="Item name"
+            inputRef={nameRef}
+            value={form.name}
+            onChangeText={(v) => {
+              setFieldHint('');
+              setForm((f) => ({ ...f, name: v }));
+            }}
+            placeholder="Super Down jacket"
+          />
         </View>
       </View>
 
-      {searching ? (
-        <Text
-          style={{
-            fontFamily: font.medium,
-            fontSize: 12,
-            color: t.textMuted,
-            marginTop: -6,
-            marginBottom: 14,
-          }}>
-          Searching…
+      {fieldHint ? (
+        <Text style={{ fontFamily: font.semibold, fontSize: 13, color: t.primary, marginTop: -6, marginBottom: 14 }}>
+          {fieldHint}
         </Text>
-      ) : suggestions.length > 0 ? (
+      ) : null}
+
+      {!editing && !suggestionsDismissed && combinedQuery.length >= MIN_QUERY_LENGTH ? (
+        <View style={{ marginTop: -6, marginBottom: 14, gap: 8 }}>
+          <Pressable accessibilityRole="button" onPress={addTypedGear}>
+            <View
+              style={{
+                backgroundColor: t.primary,
+                borderRadius: 14,
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+              }}>
+              <Text style={{ fontFamily: font.bold, fontSize: 16, color: t.onPrimary, textAlign: 'center' }}>
+                {addTypedGearLabel(combinedQuery)}
+              </Text>
+            </View>
+          </Pressable>
+          {searching ? (
+            <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>Searching…</Text>
+          ) : suggestions.length === 0 ? (
+            <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.text }}>{NO_CATALOG_MATCH}</Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      {!editing && !suggestionsDismissed && suggestions.length > 0 ? (
         <View
           style={{
             backgroundColor: t.surface,

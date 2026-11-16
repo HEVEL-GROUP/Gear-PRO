@@ -176,8 +176,11 @@ export async function pushToCloud(userId: string): Promise<void> {
   // the seed pushes nothing, and no stray dirty flag can ever upload it over
   // a real account (this is what let a logout wipe an account previously:
   // resetLocal's reseed got treated as real data to push).
-  const gearMine = s.gear.filter((it) => mine(it.ownerId) && !it.isDemo);
-  const tripsMine = s.trips.filter((it) => mine(it.ownerId) && !it.isDemo);
+  // Demo seed trips use ids like "elk" and "scout". PostgREST rejects those
+  // on trips.id (uuid), which is the PATCH /rest/v1/trips 400. A lost isDemo
+  // flag must not POST them either, so the id itself has to be a uuid.
+  const gearMine = s.gear.filter((it) => mine(it.ownerId) && !it.isDemo && isUuid(it.id));
+  const tripsMine = s.trips.filter((it) => mine(it.ownerId) && !it.isDemo && isUuid(it.id));
   const tripsMineIds = new Set(tripsMine.map((t) => t.id));
   // Bags/assignments can be the user's own even on a trip they don't own
   // (co-op packing), so scan every trip but keep only their own rows -- and
@@ -187,7 +190,7 @@ export async function pushToCloud(userId: string): Promise<void> {
   // demo trip, or a reference to demo gear, is never a real uuid.
   const bagsMine = s.trips
     .filter((t) => tripsMineIds.has(t.id))
-    .flatMap((t) => t.bags.filter((b) => mine(b.ownerId)).map((bag) => ({ trip: t, bag })));
+    .flatMap((t) => t.bags.filter((b) => mine(b.ownerId) && isUuid(b.id)).map((bag) => ({ trip: t, bag })));
   const assignmentsMine = s.trips
     .filter((t) => tripsMineIds.has(t.id))
     .flatMap((t) =>
@@ -230,35 +233,42 @@ export async function pushToCloud(userId: string): Promise<void> {
   // lets you remove someone else's row) just affects zero rows.
   const nowIso = new Date().toISOString();
   const { pendingDeletes } = s;
-  if (pendingDeletes.assignments.length) {
+  // Drop non-uuid ids before the request. "elk" / "scout" / "tent" are local
+  // seed ids; sending them is the 400. They are still cleared below so a
+  // retry does not keep PATCHing them.
+  const assignmentDeletes = pendingDeletes.assignments.filter(isUuid);
+  const bagDeletes = pendingDeletes.bags.filter(isUuid);
+  const tripDeletes = pendingDeletes.trips.filter(isUuid);
+  const gearDeletes = pendingDeletes.gear_items.filter(isUuid);
+  if (assignmentDeletes.length) {
     const { error } = await supabase
       .from('assignments')
       .update({ deleted_at: nowIso })
-      .in('id', pendingDeletes.assignments)
+      .in('id', assignmentDeletes)
       .eq('user_id', userId);
     if (error) throw error;
   }
-  if (pendingDeletes.bags.length) {
+  if (bagDeletes.length) {
     const { error } = await supabase
       .from('bags')
       .update({ deleted_at: nowIso })
-      .in('id', pendingDeletes.bags)
+      .in('id', bagDeletes)
       .eq('user_id', userId);
     if (error) throw error;
   }
-  if (pendingDeletes.trips.length) {
+  if (tripDeletes.length) {
     const { error } = await supabase
       .from('trips')
       .update({ deleted_at: nowIso })
-      .in('id', pendingDeletes.trips)
+      .in('id', tripDeletes)
       .eq('user_id', userId);
     if (error) throw error;
   }
-  if (pendingDeletes.gear_items.length) {
+  if (gearDeletes.length) {
     const { error } = await supabase
       .from('gear_items')
       .update({ deleted_at: nowIso })
-      .in('id', pendingDeletes.gear_items)
+      .in('id', gearDeletes)
       .eq('user_id', userId);
     if (error) throw error;
   }
