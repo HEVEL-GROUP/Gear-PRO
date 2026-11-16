@@ -5,14 +5,71 @@
 
 export const CANONICAL_BRANDS = ['Sea to Summit'];
 
-export const NO_CATALOG_MATCH =
-  'No catalog match - fill in brand and name, then tap Add to library';
-
 export const BRAND_FIELD_HINT = 'Add a brand. Leave it blank to save as Unknown.';
 export const NAME_FIELD_HINT = 'Add an item name.';
 
+export function normalizeGearText(value: string): string {
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+/** Shown when the catalog search settles empty. The one-tap button is rendered directly under this. */
+export function noCatalogMatchHint(text: string): string {
+  return `Not in the catalog yet. Tap Add "${normalizeGearText(text)}" below to save it.`;
+}
+
 export function addTypedGearLabel(text: string): string {
-  return `Add "${text.trim()}" as new gear`;
+  return `Add "${normalizeGearText(text)}" as new gear`;
+}
+
+export type TypedGearField = 'search' | 'brand' | 'name';
+
+export type TypedGearFields = {
+  searchText: string;
+  brand: string;
+  name: string;
+};
+
+/** Catalog query: the search box when Brand and Name are still empty, otherwise what those fields say. */
+export function catalogQueryText(searchText: string, brand: string, name: string): string {
+  if (!brand.trim() && !name.trim()) return normalizeGearText(searchText);
+  return normalizeGearText(`${brand} ${name}`);
+}
+
+/** Text Enter should hand to the typed-gear split for this field. */
+export function typedGearSource(fields: TypedGearFields, field: TypedGearField): string {
+  const search = normalizeGearText(fields.searchText);
+  const identity = normalizeGearText(`${fields.brand} ${fields.name}`);
+  if (field === 'search') return search;
+  return identity || search;
+}
+
+/** Enter/Return saves through the typed-gear path only when there is text and nothing from the catalog is selected. */
+export function enterUsesTypedGear(input: {
+  editing: boolean;
+  catalogSelected: boolean;
+  text: string;
+}): boolean {
+  return !input.editing && !input.catalogSelected && normalizeGearText(input.text).length > 0;
+}
+
+/**
+ * The sticky Add to library button uses the typed-gear split when the search
+ * box has text but Brand and Name are still empty. Otherwise the form fields win.
+ */
+export function footerUsesTypedGear(input: {
+  editing: boolean;
+  catalogSelected: boolean;
+  brand: string;
+  name: string;
+  searchText: string;
+}): boolean {
+  return (
+    !input.editing &&
+    !input.catalogSelected &&
+    !input.brand.trim() &&
+    !input.name.trim() &&
+    normalizeGearText(input.searchText).length > 0
+  );
 }
 
 export type TypedGearPlan =

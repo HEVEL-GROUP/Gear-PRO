@@ -9,11 +9,22 @@ import { EmojiPickerSheet } from '@/components/EmojiPickerSheet';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { type CatalogSuggestion, loadCatalogBrands, MIN_QUERY_LENGTH, searchCatalogProducts } from '@/lib/catalog/searchCatalog';
 import { submitCatalogWeight } from '@/lib/catalog/submitWeight';
-import { addTypedGearLabel, mergeBrandList, NO_CATALOG_MATCH, planTypedGear } from '@/lib/gearBrand';
+import {
+  addTypedGearLabel,
+  catalogQueryText,
+  enterUsesTypedGear,
+  footerUsesTypedGear,
+  mergeBrandList,
+  noCatalogMatchHint,
+  planTypedGear,
+  typedGearSource,
+  type TypedGearField,
+} from '@/lib/gearBrand';
+import { insertGearItem, visibleGearInsertError } from '@/lib/gearInsert';
 import { resolveWeightLb, splitWeight, validateGearDraft, weightFieldsFromCatalog } from '@/lib/gearForm';
 import { tapLight } from '@/lib/haptics';
 import { font, useTheme } from '@/theme/tokens';
-import { useGearStore } from '@/store/useGearStore';
+import { isUuid, useGearStore } from '@/store/useGearStore';
 
 // Capped low, and rendered in a height-limited scroller (below) -- this
 // shows up in a bottom sheet with a phone keyboard already covering half
@@ -74,9 +85,13 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
   const [searching, setSearching] = useState(false);
   const [catalogBrands, setCatalogBrands] = useState<string[]>([]);
   const [fieldHint, setFieldHint] = useState('');
+  const [searchText, setSearchText] = useState('');
   const searchSeq = useRef(0);
   const brandRef = useRef<TextInput>(null);
   const nameRef = useRef<TextInput>(null);
+  const pendingGearId = useRef<string | null>(null);
+  const announcedCreate = useRef(false);
+  const saving = useRef(false);
   const knownBrands = useMemo(
     () => mergeBrandList(catalogBrands, gear.map((item) => item.brand)),
     [catalogBrands, gear],
@@ -88,20 +103,19 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
   // newer one (a slow first keystroke's result arriving after the third
   // keystroke's) and clobbering the list with stale suggestions.
   //
-  // Both fields feed ONE combined query rather than triggering separate
-  // searches, because the ranking (search_catalog_products, trigram
-  // similarity against brand+name) is what makes a bare brand ever safe to
-  // search on: "KUIU" alone scores a loose brand-level match against every
-  // KUIU product, but "KUIU rain" sharpens to the actual rain jacket. Firing
-  // brand and name as independent queries would lose that combination.
+  // The search box and the brand/name fields feed ONE query rather than
+  // triggering separate searches, because the ranking (search_catalog_products,
+  // trigram similarity against brand+name) is what makes a bare brand ever
+  // safe to search on: "KUIU" alone scores a loose brand-level match against
+  // every KUIU product, but "KUIU rain" sharpens to the actual rain jacket.
   //
   // This app is explicitly offline-first and used in the backcountry --
   // a failed/timed-out search (no signal at a trailhead) is an expected,
   // routine outcome, not an error worth surfacing. It fails silently into
   // "no suggestions," same as if the catalog just didn't have a match.
-  const combinedQuery = `${form.brand} ${form.name}`.trim();
+  const activeQuery = catalogQueryText(searchText, form.brand, form.name);
   useEffect(() => {
-    if (!visible || editing || suggestionsDismissed || combinedQuery.length < MIN_QUERY_LENGTH) {
+    if (!visible || editing || suggestionsDismissed || activeQuery.length < MIN_QUERY_LENGTH) {
       setSuggestions([]);
       setSearching(false);
       return;
@@ -110,7 +124,7 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
     setSearching(true);
     setSuggestions([]);
     const timer = setTimeout(() => {
-      searchCatalogProducts(combinedQuery, SUGGESTION_LIMIT)
+      searchCatalogProducts(activeQuery, SUGGESTION_LIMIT)
         .catch(() => [])
         .then((results) => {
           if (searchSeq.current !== seq) return;
@@ -119,7 +133,7 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
         });
     }, 250);
     return () => clearTimeout(timer);
-  }, [combinedQuery, visible, editing, suggestionsDismissed]);
+  }, [activeQuery, visible, editing, suggestionsDismissed]);
 
   const applySuggestion = (s: CatalogSuggestion) => {
     tapLight();
@@ -160,6 +174,10 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
     setSuggestionsDismissed(false);
     setSearching(false);
     setFieldHint('');
+    setSearchText('');
+    pendingGearId.current = null;
+    announcedCreate.current = false;
+    saving.current = false;
     setForm(
       editing
         ? {
@@ -181,53 +199,87 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
     ? trips.some((tr) => tr.assignments.some((a) => a.gearId === editing.id))
     : false;
 
-  const save = (override?: { brand: string; name: string; quantity: string }) => {
-    const result = validateGearDraft({
-      brand: override?.brand ?? form.brand,
-      name: override?.name ?? form.name,
-      weightLb: form.weightLb,
-      weightOz: form.weightOz,
-      quantity: override?.quantity ?? form.quantity,
-      expiration: form.expiration,
-    });
-    if (!result.ok) {
-      setError(result.error);
-      return;
+  const save = async (override?: { brand: string; name: string; quantity: string }) => {
+    if (saving.current) return;
+    saving.current = true;
+    try {
+      const result = validateGearDraft({
+        brand: override?.brand ?? form.brand,
+        name: override?.name ?? form.name,
+        weightLb: form.weightLb,
+        weightOz: form.weightOz,
+        quantity: override?.quantity ?? form.quantity,
+        expiration: form.expiration,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      const { brand, name, weightLb: weight, quantity } = result.value;
+      const payload = {
+        brand,
+        name,
+        category: form.category,
+        weightLb: weight,
+        quantity,
+        notes: form.notes.trim() || undefined,
+        expiration: form.expiration.trim() || undefined,
+        emoji: form.emoji.trim() || undefined,
+        catalogProductId: form.catalogProductId ?? undefined,
+      };
+      let gearId: string;
+      if (editing) {
+        gearId = editing.id;
+        updateGear(gearId, payload);
+      } else if (pendingGearId.current) {
+        gearId = pendingGearId.current;
+        updateGear(gearId, payload);
+      } else {
+        gearId = addGear(payload);
+        pendingGearId.current = gearId;
+      }
+      const stored = useGearStore.getState().gear.find((item) => item.id === gearId);
+      const userId = session?.user.id;
+      // Demo seed ids ("tent", "elk") are not uuids. Sync already skips them;
+      // sending one is a guaranteed 400, not a failure the user can retry.
+      if (stored && isUuid(stored.id) && !stored.isDemo) {
+        if (!userId) {
+          setError(visibleGearInsertError({ message: 'Not signed in' }) ?? '');
+          return;
+        }
+        const inserted = await insertGearItem(userId, stored);
+        const insertError = visibleGearInsertError(inserted.error);
+        if (insertError) {
+          setError(insertError);
+          return;
+        }
+      }
+      if (!editing && !announcedCreate.current) {
+        announcedCreate.current = true;
+        onCreated?.(gearId);
+      }
+      // Fire-and-forget, after the local save already succeeded -- the weight
+      // the user just entered for their own gear doubles as a submission for
+      // whichever catalog product this item is linked to (set once, at
+      // creation, via applySuggestion). Never blocks or can fail the actual
+      // save; see submitCatalogWeight's own module comment for why a failure
+      // here is silently dropped rather than surfaced.
+      if (form.catalogProductId && userId) {
+        submitCatalogWeight(userId, form.catalogProductId, weight);
+      }
+      onClose();
+    } finally {
+      saving.current = false;
     }
-    const { brand, name, weightLb: weight, quantity } = result.value;
-    const payload = {
-      brand,
-      name,
-      category: form.category,
-      weightLb: weight,
-      quantity,
-      notes: form.notes.trim() || undefined,
-      expiration: form.expiration.trim() || undefined,
-      emoji: form.emoji.trim() || undefined,
-      catalogProductId: form.catalogProductId ?? undefined,
-    };
-    if (editing) updateGear(editing.id, payload);
-    else onCreated?.(addGear(payload));
-    // Fire-and-forget, after the local save already succeeded -- the weight
-    // the user just entered for their own gear doubles as a submission for
-    // whichever catalog product this item is linked to (set once, at
-    // creation, via applySuggestion). Never blocks or can fail the actual
-    // save; see submitCatalogWeight's own module comment for why a failure
-    // here is silently dropped rather than surfaced.
-    if (form.catalogProductId && session?.user.id) {
-      submitCatalogWeight(session.user.id, form.catalogProductId, weight);
-    }
-    onClose();
   };
 
-  const addTypedGear = () => {
-    tapLight();
-    const plan = planTypedGear(combinedQuery, knownBrands);
+  const runTypedGear = (text: string) => {
+    const plan = planTypedGear(text, knownBrands);
     if (plan.kind === 'save') {
       const quantity = '1';
       setForm((f) => ({ ...f, brand: plan.brand, name: plan.name, quantity }));
       setFieldHint('');
-      save({ brand: plan.brand, name: plan.name, quantity });
+      void save({ brand: plan.brand, name: plan.name, quantity });
       return;
     }
     setForm((f) => ({ ...f, brand: plan.brand, name: plan.name }));
@@ -238,104 +290,50 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
     });
   };
 
+  const addTypedGear = () => {
+    tapLight();
+    runTypedGear(activeQuery);
+  };
+
+  const submitFromField = (field: TypedGearField) => {
+    const text = typedGearSource({ searchText, brand: form.brand, name: form.name }, field);
+    if (enterUsesTypedGear({ editing: !!editing, catalogSelected: !!form.catalogProductId, text })) {
+      runTypedGear(text);
+      return;
+    }
+    if (editing || form.catalogProductId) void save();
+  };
+
+  const onFooterPress = () => {
+    if (
+      footerUsesTypedGear({
+        editing: !!editing,
+        catalogSelected: !!form.catalogProductId,
+        brand: form.brand,
+        name: form.name,
+        searchText,
+      })
+    ) {
+      runTypedGear(searchText);
+      return;
+    }
+    void save();
+  };
+
   const resolvedWeight = resolveWeightLb(form.weightLb, form.weightOz);
   const weightBlank = !form.weightLb.trim() && !form.weightOz.trim();
-
-  return (
-    <Sheet
-      visible={visible}
-      onClose={onClose}
-      title={editing ? 'Edit gear' : 'Add gear'}
-      footer={
-        <View style={{ gap: 10 }}>
-          {error ? (
-            <Text accessibilityRole="alert" style={{ fontFamily: font.medium, fontSize: 13, color: t.alert }}>
-              {error}
-            </Text>
-          ) : null}
-          <Button label={editing ? 'Save changes' : 'Add to library'} onPress={save} />
-        </View>
-      }>
-      {notice ? (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 10,
-            backgroundColor: t.alertSoft,
-            borderRadius: 12,
-            padding: 12,
-            marginBottom: 14,
-          }}>
-          <Ionicons name="alert-circle-outline" size={18} color={t.alertText} />
-          <Text style={{ flex: 1, fontFamily: font.semibold, fontSize: 13, color: t.alertText }}>{notice}</Text>
-        </View>
-      ) : null}
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <View style={{ flex: 1 }}>
-          <Field
-            label="Brand"
-            inputRef={brandRef}
-            value={form.brand}
-            onChangeText={(v) => {
-              setFieldHint('');
-              setForm((f) => ({ ...f, brand: v }));
-            }}
-            placeholder="KUIU"
-          />
-        </View>
-        <View style={{ flex: 1.4 }}>
-          <Field
-            label="Item name"
-            inputRef={nameRef}
-            value={form.name}
-            onChangeText={(v) => {
-              setFieldHint('');
-              setForm((f) => ({ ...f, name: v }));
-            }}
-            placeholder="Super Down jacket"
-          />
-        </View>
-      </View>
-
-      {fieldHint ? (
-        <Text style={{ fontFamily: font.semibold, fontSize: 13, color: t.primary, marginTop: -6, marginBottom: 14 }}>
-          {fieldHint}
-        </Text>
-      ) : null}
-
-      {!editing && !suggestionsDismissed && combinedQuery.length >= MIN_QUERY_LENGTH ? (
-        <View style={{ marginTop: -6, marginBottom: 14, gap: 8 }}>
-          <Pressable accessibilityRole="button" onPress={addTypedGear}>
-            <View
-              style={{
-                backgroundColor: t.primary,
-                borderRadius: 14,
-                paddingVertical: 14,
-                paddingHorizontal: 16,
-              }}>
-              <Text style={{ fontFamily: font.bold, fontSize: 16, color: t.onPrimary, textAlign: 'center' }}>
-                {addTypedGearLabel(combinedQuery)}
-              </Text>
-            </View>
-          </Pressable>
-          {searching ? (
-            <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>Searching…</Text>
-          ) : suggestions.length === 0 ? (
-            <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.text }}>{NO_CATALOG_MATCH}</Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      {!editing && !suggestionsDismissed && suggestions.length > 0 ? (
+  const promptUnderSearch = !form.brand.trim() && !form.name.trim() && searchText.trim().length > 0;
+  const showTypedPrompt = !editing && !suggestionsDismissed && activeQuery.length >= MIN_QUERY_LENGTH;
+  const showNoMatchHint = showTypedPrompt && !searching && suggestions.length === 0;
+  const typedPrompt = showTypedPrompt ? (
+    <View style={{ marginTop: -6, marginBottom: 14, gap: 8 }}>
+      {suggestions.length > 0 ? (
         <View
           style={{
             backgroundColor: t.surface,
             borderWidth: 1,
             borderColor: t.border,
             borderRadius: 14,
-            marginTop: -6,
-            marginBottom: 14,
             maxHeight: SUGGESTION_LIST_MAX_HEIGHT,
             overflow: 'hidden',
           }}>
@@ -388,6 +386,113 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
           </ScrollView>
         </View>
       ) : null}
+      {searching ? (
+        <Text style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>Searching…</Text>
+      ) : null}
+      {showNoMatchHint ? (
+        <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.text }}>{noCatalogMatchHint(activeQuery)}</Text>
+      ) : null}
+      <Pressable accessibilityRole="button" onPress={addTypedGear}>
+        <View
+          style={{
+            backgroundColor: t.primary,
+            borderRadius: 14,
+            paddingVertical: 14,
+            paddingHorizontal: 16,
+          }}>
+          <Text style={{ fontFamily: font.bold, fontSize: 16, color: t.onPrimary, textAlign: 'center' }}>
+            {addTypedGearLabel(activeQuery)}
+          </Text>
+        </View>
+      </Pressable>
+    </View>
+  ) : null;
+
+  return (
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title={editing ? 'Edit gear' : 'Add gear'}
+      footer={
+        <View style={{ gap: 10 }}>
+          {error ? (
+            <Text accessibilityRole="alert" style={{ fontFamily: font.medium, fontSize: 13, color: t.alert }}>
+              {error}
+            </Text>
+          ) : null}
+          <Button label={editing ? 'Save changes' : 'Add to library'} onPress={onFooterPress} />
+        </View>
+      }>
+      {notice ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            backgroundColor: t.alertSoft,
+            borderRadius: 12,
+            padding: 12,
+            marginBottom: 14,
+          }}>
+          <Ionicons name="alert-circle-outline" size={18} color={t.alertText} />
+          <Text style={{ flex: 1, fontFamily: font.semibold, fontSize: 13, color: t.alertText }}>{notice}</Text>
+        </View>
+      ) : null}
+      {!editing ? (
+        <Field
+          label="Search"
+          value={searchText}
+          onChangeText={(v) => {
+            setSearchText(v);
+            setSuggestionsDismissed(false);
+            setFieldHint('');
+          }}
+          placeholder="Sea to Summit sleeping bag liner"
+          autoCapitalize="none"
+          onSubmitEditing={() => submitFromField('search')}
+          returnKeyType="done"
+        />
+      ) : null}
+      {promptUnderSearch ? typedPrompt : null}
+
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        <View style={{ flex: 1 }}>
+          <Field
+            label="Brand"
+            inputRef={brandRef}
+            value={form.brand}
+            onChangeText={(v) => {
+              setFieldHint('');
+              setForm((f) => ({ ...f, brand: v }));
+            }}
+            placeholder="KUIU"
+            onSubmitEditing={() => submitFromField('brand')}
+            returnKeyType="done"
+          />
+        </View>
+        <View style={{ flex: 1.4 }}>
+          <Field
+            label="Item name"
+            inputRef={nameRef}
+            value={form.name}
+            onChangeText={(v) => {
+              setFieldHint('');
+              setForm((f) => ({ ...f, name: v }));
+            }}
+            placeholder="Super Down jacket"
+            onSubmitEditing={() => submitFromField('name')}
+            returnKeyType="done"
+          />
+        </View>
+      </View>
+
+      {fieldHint ? (
+        <Text style={{ fontFamily: font.semibold, fontSize: 13, color: t.primary, marginTop: -6, marginBottom: 14 }}>
+          {fieldHint}
+        </Text>
+      ) : null}
+
+      {promptUnderSearch ? null : typedPrompt}
 
       <ChipPicker
         label="Category"
