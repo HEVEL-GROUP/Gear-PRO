@@ -17,7 +17,7 @@ import {
   useGearStore,
 } from '@/store/useGearStore';
 
-function toGearRow(userId: string, g: GearItem) {
+export function toGearRow(userId: string, g: GearItem) {
   return {
     id: g.id,
     user_id: userId,

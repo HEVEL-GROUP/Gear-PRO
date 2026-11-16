@@ -30,6 +30,8 @@ export function createFakeSupabase() {
     upserts: [] as { table: string; rows: Row[] }[],
     softDeletes: [] as { table: string; ids: string[] }[],
   };
+  // One-shot failure for the next upsert. Cleared as soon as it is consumed.
+  let upsertError: { message: string } | null = null;
 
   function seed(table: keyof FakeTables, rows: Row[]) {
     for (const r of rows) tables[table].set((r.id ?? r.user_id) as string, { ...r });
@@ -58,6 +60,11 @@ export function createFakeSupabase() {
       },
       upsert(rows: Row[]) {
         calls.upserts.push({ table, rows: rows.map((r) => ({ ...r })) });
+        if (upsertError) {
+          const error = upsertError;
+          upsertError = null;
+          return Promise.resolve({ error });
+        }
         for (const r of rows) {
           // gear_category_prefs has no `id` column -- its primary key is
           // `user_id` (one row per user), same as the real migration.
@@ -88,7 +95,18 @@ export function createFakeSupabase() {
     };
   }
 
-  return { from, tables, calls, seed };
+  return {
+    from,
+    tables,
+    calls,
+    seed,
+    failNextUpsert(message: string) {
+      upsertError = { message };
+    },
+    clearUpsertError() {
+      upsertError = null;
+    },
+  };
 }
 
 // Singleton so `jest.mock('@/lib/supabase/client', ...)` (hoisted above
@@ -103,4 +121,5 @@ export function resetFakeSupabase() {
   }
   fakeSupabase.calls.upserts.length = 0;
   fakeSupabase.calls.softDeletes.length = 0;
+  fakeSupabase.clearUpsertError();
 }

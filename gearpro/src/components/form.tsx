@@ -152,6 +152,8 @@ export function Field({
   secureTextEntry,
   autoComplete,
   inputRef,
+  onSubmitEditing,
+  returnKeyType,
 }: {
   label: string;
   value: string;
@@ -163,6 +165,8 @@ export function Field({
   secureTextEntry?: boolean;
   autoComplete?: 'email' | 'password' | 'off';
   inputRef?: Ref<TextInput>;
+  onSubmitEditing?: () => void;
+  returnKeyType?: 'done' | 'go' | 'next' | 'search' | 'default';
 }) {
   const t = useTheme();
   return (
@@ -180,6 +184,9 @@ export function Field({
         autoCapitalize={autoCapitalize}
         secureTextEntry={secureTextEntry}
         autoComplete={autoComplete}
+        returnKeyType={returnKeyType}
+        blurOnSubmit={!multiline}
+        onSubmitEditing={onSubmitEditing}
         textContentType={secureTextEntry ? 'password' : autoComplete === 'email' ? 'emailAddress' : undefined}
         style={{
           fontFamily: font.medium,
