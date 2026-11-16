@@ -1,6 +1,7 @@
 import {
   GEAR_DATE_MESSAGE,
-  GEAR_REQUIRED_MESSAGE,
+  GEAR_IDENTITY_MESSAGE,
+  GEAR_QUANTITY_MESSAGE,
   GEAR_WEIGHT_MESSAGE,
   resolveWeightLb,
   splitWeight,
@@ -20,24 +21,37 @@ const draft = {
 describe('validateGearDraft', () => {
   it('saves a blank weight as 0', () => {
     const result = validateGearDraft(draft);
-    expect(result).toEqual({ ok: true, value: { weightLb: 0, quantity: 1 } });
+    expect(result).toEqual({ ok: true, value: { brand: 'KUIU', name: 'Super Down', weightLb: 0, quantity: 1 } });
   });
 
   it('saves an explicit 0 as 0', () => {
     const result = validateGearDraft({ ...draft, weightLb: '0', weightOz: '0' });
-    expect(result).toEqual({ ok: true, value: { weightLb: 0, quantity: 1 } });
+    expect(result).toEqual({ ok: true, value: { brand: 'KUIU', name: 'Super Down', weightLb: 0, quantity: 1 } });
   });
 
   it('combines pounds and ounces', () => {
     const result = validateGearDraft({ ...draft, weightLb: '1', weightOz: '8' });
-    expect(result).toEqual({ ok: true, value: { weightLb: 1.5, quantity: 1 } });
+    expect(result).toEqual({ ok: true, value: { brand: 'KUIU', name: 'Super Down', weightLb: 1.5, quantity: 1 } });
   });
 
-  it('keeps requiring a brand, a name, and a quantity of at least 1', () => {
-    expect(validateGearDraft({ ...draft, brand: '  ' }).ok).toBe(false);
-    expect(validateGearDraft({ ...draft, name: '' })).toEqual({ ok: false, error: GEAR_REQUIRED_MESSAGE });
-    expect(validateGearDraft({ ...draft, quantity: '0' })).toEqual({ ok: false, error: GEAR_REQUIRED_MESSAGE });
-    expect(validateGearDraft({ ...draft, quantity: '-2' })).toEqual({ ok: false, error: GEAR_REQUIRED_MESSAGE });
+  it('fills a missing brand as Unknown and a missing name from the brand', () => {
+    expect(validateGearDraft({ ...draft, brand: '  ' })).toEqual({
+      ok: true,
+      value: { brand: 'Unknown', name: 'Super Down', weightLb: 0, quantity: 1 },
+    });
+    expect(validateGearDraft({ ...draft, name: '' })).toEqual({
+      ok: true,
+      value: { brand: 'KUIU', name: 'KUIU', weightLb: 0, quantity: 1 },
+    });
+    expect(validateGearDraft({ ...draft, brand: '', name: '  ' })).toEqual({
+      ok: false,
+      error: GEAR_IDENTITY_MESSAGE,
+    });
+  });
+
+  it('keeps requiring a quantity of at least 1', () => {
+    expect(validateGearDraft({ ...draft, quantity: '0' })).toEqual({ ok: false, error: GEAR_QUANTITY_MESSAGE });
+    expect(validateGearDraft({ ...draft, quantity: '-2' })).toEqual({ ok: false, error: GEAR_QUANTITY_MESSAGE });
   });
 
   it('rejects a weight that is not a number', () => {
@@ -55,7 +69,7 @@ describe('validateGearDraft', () => {
     });
     expect(validateGearDraft({ ...draft, expiration: '2026-12-31' })).toEqual({
       ok: true,
-      value: { weightLb: 0, quantity: 1 },
+      value: { brand: 'KUIU', name: 'Super Down', weightLb: 0, quantity: 1 },
     });
   });
 });

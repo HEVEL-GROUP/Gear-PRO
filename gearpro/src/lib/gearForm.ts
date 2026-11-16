@@ -5,7 +5,11 @@
 // already defaults to. Null would be rejected by the insert. Pack totals
 // multiply weight by quantity, so 0 contributes nothing and stays finite.
 
-export const GEAR_REQUIRED_MESSAGE = 'Add a brand, a name, and a quantity of at least 1.';
+// gear_items.brand is nullable (default ''). gear_items.name is NOT NULL, so a
+// missing name is filled from the brand text rather than stored as null.
+export const UNKNOWN_BRAND = 'Unknown';
+export const GEAR_IDENTITY_MESSAGE = 'Add a brand or a name.';
+export const GEAR_QUANTITY_MESSAGE = 'Add a quantity of at least 1.';
 export const GEAR_WEIGHT_MESSAGE = 'Enter weight as a number, or leave it blank.';
 export const GEAR_DATE_MESSAGE = 'Expiration date should look like 2026-12-31, or leave it blank.';
 
@@ -22,10 +26,22 @@ export type GearDraft = {
 };
 
 export type ValidGearFields = {
+  brand: string;
+  name: string;
   /** Pounds. 0 when the user left weight blank or entered 0. */
   weightLb: number;
   quantity: number;
 };
+
+/** Brand may be omitted (stored as Unknown). Name may not: the column is NOT NULL. */
+export function resolveGearIdentity(brandRaw: string, nameRaw: string): { brand: string; name: string } | null {
+  const brand = brandRaw.trim();
+  const name = nameRaw.trim();
+  if (!brand && !name) return null;
+  if (!name) return { brand: brand || UNKNOWN_BRAND, name: brand };
+  if (!brand) return { brand: UNKNOWN_BRAND, name };
+  return { brand, name };
+}
 
 export type GearDraftResult =
   | { ok: true; value: ValidGearFields }
@@ -50,16 +66,18 @@ export function resolveWeightLb(lbStr: string, ozStr: string): number | 'invalid
 }
 
 export function validateGearDraft(draft: GearDraft): GearDraftResult {
+  const identity = resolveGearIdentity(draft.brand, draft.name);
+  if (!identity) return { ok: false, error: GEAR_IDENTITY_MESSAGE };
   const quantity = Number(draft.quantity);
-  if (!draft.brand.trim() || !draft.name.trim() || !Number.isFinite(quantity) || !(quantity >= 1)) {
-    return { ok: false, error: GEAR_REQUIRED_MESSAGE };
+  if (!Number.isFinite(quantity) || !(quantity >= 1)) {
+    return { ok: false, error: GEAR_QUANTITY_MESSAGE };
   }
   const weightLb = resolveWeightLb(draft.weightLb, draft.weightOz);
   if (weightLb === 'invalid') return { ok: false, error: GEAR_WEIGHT_MESSAGE };
   if (draft.expiration.trim() !== '' && !DATE_RE.test(draft.expiration.trim())) {
     return { ok: false, error: GEAR_DATE_MESSAGE };
   }
-  return { ok: true, value: { weightLb, quantity: Math.round(quantity) } };
+  return { ok: true, value: { ...identity, weightLb, quantity: Math.round(quantity) } };
 }
 
 // lb and oz are two halves of one physical weight. A full 16 oz rolls into

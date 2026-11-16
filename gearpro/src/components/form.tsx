@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ReactNode, useState } from 'react';
+import { ReactNode, Ref, useState } from 'react';
 import {
   KeyboardAvoidingView,
   KeyboardTypeOptions,
@@ -151,6 +151,7 @@ export function Field({
   autoCapitalize = 'sentences',
   secureTextEntry,
   autoComplete,
+  inputRef,
 }: {
   label: string;
   value: string;
@@ -161,12 +162,14 @@ export function Field({
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   secureTextEntry?: boolean;
   autoComplete?: 'email' | 'password' | 'off';
+  inputRef?: Ref<TextInput>;
 }) {
   const t = useTheme();
   return (
     <View style={{ marginBottom: 14 }}>
       <Label>{label}</Label>
       <TextInput
+        ref={inputRef}
         value={value}
         onChangeText={onChangeText}
         onFocus={(e) => scrollFocusedFieldIntoView(e.target)}
