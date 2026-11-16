@@ -9,6 +9,7 @@ import { EmojiPickerSheet } from '@/components/EmojiPickerSheet';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { type CatalogSuggestion, MIN_QUERY_LENGTH, searchCatalogProducts } from '@/lib/catalog/searchCatalog';
 import { submitCatalogWeight } from '@/lib/catalog/submitWeight';
+import { resolveWeightLb, splitWeight, validateGearDraft, weightFieldsFromCatalog } from '@/lib/gearForm';
 import { tapLight } from '@/lib/haptics';
 import { font, useTheme } from '@/theme/tokens';
 import { useGearStore } from '@/store/useGearStore';
@@ -48,20 +49,6 @@ const blank = {
   expiration: '',
   emoji: '',
   catalogProductId: null as string | null,
-};
-
-const isValidDate = (s: string) => s === '' || /^\d{4}-\d{2}-\d{2}$/.test(s.trim());
-
-// weightLb/weightOz are two halves of one physical weight -- oz is always
-// < 16 (a full pound rolls into the lb side) so the two fields never
-// disagree about how heavy the item actually is.
-const combineWeight = (lbStr: string, ozStr: string): number =>
-  (Number(lbStr) || 0) + (Number(ozStr) || 0) / 16;
-
-const splitWeight = (totalLb: number): { weightLb: string; weightOz: string } => {
-  const lb = Math.floor(totalLb);
-  const oz = Math.round((totalLb - lb) * 16 * 100) / 100;
-  return { weightLb: String(lb), weightOz: oz > 0 ? String(oz) : '' };
 };
 
 export function GearFormModal({ visible, onClose, editId, notice, onCreated }: Props) {
@@ -127,7 +114,7 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
   const applySuggestion = (s: CatalogSuggestion) => {
     tapLight();
     Keyboard.dismiss();
-    const weightSplit = s.weightLb != null ? splitWeight(s.weightLb) : null;
+    const weightSplit = weightFieldsFromCatalog(s.weightLb);
     setForm((f) => ({
       ...f,
       brand: s.brand || f.brand,
@@ -170,22 +157,25 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
     : false;
 
   const save = () => {
-    const weight = combineWeight(form.weightLb, form.weightOz);
-    const quantity = Number(form.quantity);
-    if (!form.brand.trim() || !form.name.trim() || !(weight > 0) || !(quantity >= 1)) {
-      setError('Add a brand, name, a weight above 0, and quantity of at least 1.');
+    const result = validateGearDraft({
+      brand: form.brand,
+      name: form.name,
+      weightLb: form.weightLb,
+      weightOz: form.weightOz,
+      quantity: form.quantity,
+      expiration: form.expiration,
+    });
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
-    if (!isValidDate(form.expiration)) {
-      setError('Expiration date should look like 2026-12-31, or leave it blank.');
-      return;
-    }
+    const { weightLb: weight, quantity } = result.value;
     const payload = {
       brand: form.brand.trim(),
       name: form.name.trim(),
       category: form.category,
       weightLb: weight,
-      quantity: Math.round(quantity),
+      quantity,
       notes: form.notes.trim() || undefined,
       expiration: form.expiration.trim() || undefined,
       emoji: form.emoji.trim() || undefined,
@@ -205,8 +195,24 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
     onClose();
   };
 
+  const resolvedWeight = resolveWeightLb(form.weightLb, form.weightOz);
+  const weightBlank = !form.weightLb.trim() && !form.weightOz.trim();
+
   return (
-    <Sheet visible={visible} onClose={onClose} title={editing ? 'Edit gear' : 'Add gear'}>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title={editing ? 'Edit gear' : 'Add gear'}
+      footer={
+        <View style={{ gap: 10 }}>
+          {error ? (
+            <Text accessibilityRole="alert" style={{ fontFamily: font.medium, fontSize: 13, color: t.alert }}>
+              {error}
+            </Text>
+          ) : null}
+          <Button label={editing ? 'Save changes' : 'Add to library'} onPress={save} />
+        </View>
+      }>
       {notice ? (
         <View
           style={{
@@ -277,7 +283,7 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
                   <Text numberOfLines={1} style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted }}>
                     {s.brand ? `${s.brand} · ` : ''}
                     {s.category}
-                    {s.weightLb != null ? ` · ${s.weightLb} lb` : ''}
+                    {s.weightLb != null && s.weightLb > 0 ? ` · ${s.weightLb} lb` : ''}
                   </Text>
                 </View>
                 {s.link ? (
@@ -346,18 +352,22 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
 
       <View style={{ flexDirection: 'row', gap: 12 }}>
         <View style={{ flex: 1 }}>
-          <Field label="Weight (lb)" value={form.weightLb} onChangeText={(v) => setForm((f) => ({ ...f, weightLb: v }))} placeholder="0" keyboardType="decimal-pad" />
+          <Field label="Weight (lb)" value={form.weightLb} onChangeText={(v) => setForm((f) => ({ ...f, weightLb: v }))} placeholder="optional" keyboardType="decimal-pad" />
         </View>
         <View style={{ flex: 1 }}>
-          <Field label="Weight (oz)" value={form.weightOz} onChangeText={(v) => setForm((f) => ({ ...f, weightOz: v }))} placeholder="0" keyboardType="decimal-pad" />
+          <Field label="Weight (oz)" value={form.weightOz} onChangeText={(v) => setForm((f) => ({ ...f, weightOz: v }))} placeholder="optional" keyboardType="decimal-pad" />
         </View>
         <View style={{ flex: 1 }}>
           <Field label="Owned qty" value={form.quantity} onChangeText={(v) => setForm((f) => ({ ...f, quantity: v }))} placeholder="1" keyboardType="number-pad" />
         </View>
       </View>
-      {form.weightLb || form.weightOz ? (
+      {typeof resolvedWeight === 'number' && resolvedWeight > 0 ? (
         <Text style={{ fontFamily: font.semibold, fontSize: 12, color: t.textMuted, marginTop: -6, marginBottom: 14 }}>
-          Total: {combineWeight(form.weightLb, form.weightOz).toFixed(2)} lb
+          Total: {resolvedWeight.toFixed(2)} lb
+        </Text>
+      ) : weightBlank ? (
+        <Text style={{ fontFamily: font.semibold, fontSize: 12, color: t.textMuted, marginTop: -6, marginBottom: 14 }}>
+          Weight is optional.
         </Text>
       ) : null}
 
@@ -395,12 +405,6 @@ export function GearFormModal({ visible, onClose, editId, notice, onCreated }: P
       </View>
 
       <Field label="Notes" value={form.notes} onChangeText={(v) => setForm((f) => ({ ...f, notes: v }))} placeholder="Maintenance, fit, replacement…" multiline />
-
-      {error ? (
-        <Text style={{ fontFamily: font.medium, fontSize: 13, color: t.alert, marginBottom: 10 }}>{error}</Text>
-      ) : null}
-
-      <Button label={editing ? 'Save changes' : 'Add to library'} onPress={save} />
 
       {editing ? (
         <View style={{ marginTop: 10 }}>

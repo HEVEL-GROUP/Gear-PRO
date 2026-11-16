@@ -1,16 +1,21 @@
 import {
+  categoryBreakdown,
   daysUntilExpiration,
   demoDataCounts,
   expiringGear,
+  finiteWeightLb,
   flaggedAssignments,
   filterGearInventory,
+  gearMap,
   gearMatchesQuery,
   groupByCategory,
   hashGear,
+  lineWeightLb,
   packedCount,
   sortTripsFeaturedFirst,
   Trip,
   tripLifecycle,
+  tripWeight,
   useGearStore,
 } from './useGearStore';
 
@@ -516,6 +521,58 @@ describe('useGearStore', () => {
 // a cloud row) computed it -- an adversarial review of an earlier draft of
 // this design flagged that exact asymmetry as a way for a row to look
 // permanently "dirty" and never converge. These pin the normalization down.
+describe('pack weight with no recorded weight', () => {
+  beforeEach(() => {
+    useGearStore.getState().resetLocal();
+  });
+
+  it('treats 0 and a missing weight as zero instead of NaN', () => {
+    expect(finiteWeightLb(0)).toBe(0);
+    expect(finiteWeightLb(null)).toBe(0);
+    expect(finiteWeightLb(undefined)).toBe(0);
+    expect(lineWeightLb(0, 3)).toBe(0);
+    expect(Number.isFinite(lineWeightLb(undefined, 2))).toBe(true);
+
+    const gearId = useGearStore.getState().addGear({
+      brand: 'KUIU',
+      name: 'Rain jacket',
+      category: 'Clothing',
+      weightLb: 0,
+      quantity: 1,
+    });
+    const stoveId = useGearStore.getState().addGear({
+      brand: 'MSR',
+      name: 'PocketRocket',
+      category: 'Cooking',
+      weightLb: 0.16,
+      quantity: 1,
+    });
+    const tripId = useGearStore.getState().addTrip({
+      name: 'Trip',
+      location: '',
+      startDate: '',
+      endDate: '',
+      bags: [],
+      assignments: [],
+    });
+    useGearStore.getState().addBag(tripId, { label: 'Pack', maxWeightLb: 40, color: '#000' });
+    const bagId = useGearStore.getState().trips.find((t) => t.id === tripId)!.bags[0].id;
+    useGearStore.getState().addAssignment(tripId, bagId, gearId, 1);
+    useGearStore.getState().addAssignment(tripId, bagId, stoveId, 2);
+
+    const state = useGearStore.getState();
+    const trip = state.trips.find((t) => t.id === tripId)!;
+    const byId = gearMap(state.gear);
+    expect(tripWeight(trip, byId)).toBeCloseTo(0.32);
+    const rows = categoryBreakdown(trip, byId);
+    expect(rows.every((row) => Number.isFinite(row.weight))).toBe(true);
+    expect(rows.reduce((sum, row) => sum + row.weight, 0)).toBeCloseTo(0.32);
+    const owned = state.gear.reduce((sum, item) => sum + lineWeightLb(item.weightLb, item.quantity), 0);
+    expect(Number.isFinite(owned)).toBe(true);
+    expect(owned).toBeCloseTo(0.16);
+  });
+});
+
 describe('hashGear', () => {
   const base = { brand: 'Hilleberg', name: 'Nallo 2', category: 'Shelter', weightLb: 5.5, quantity: 1 };
 

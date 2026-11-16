@@ -10,6 +10,7 @@ import { tapLight, tapSuccess } from '@/lib/haptics';
 import { font, radius, useTheme } from '@/theme/tokens';
 import {
   filterGearInventory,
+  finiteWeightLb,
   groupByCategory,
   isExpiredDate,
   remainingToAssign,
@@ -203,7 +204,7 @@ export function PlanGearPickerSheet({ visible, onClose, trip, bagId, today }: Pr
                         </Text>
                         <Text
                           style={{ fontFamily: font.medium, fontSize: 12, color: t.textMuted, marginTop: 2 }}>
-                          {item.weightLb.toFixed(2)} lb · {remaining} left to pack
+                          {finiteWeightLb(item.weightLb).toFixed(2)} lb · {remaining} left to pack
                         </Text>
                       </View>
                       {expired ? <Chip label="Expired" tone="alert" /> : null}

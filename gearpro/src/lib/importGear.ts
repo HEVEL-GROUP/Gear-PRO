@@ -117,9 +117,9 @@ export type ImportResult = {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// Rows must clear the same bar as the manual "Add gear" form (weight > 0,
-// quantity >= 1) so an import can't silently create the zero-weight/qty
-// junk entries the form itself refuses to save.
+// Spreadsheet rows still need a real weight (> 0) and a quantity of at least 1.
+// The manual Add gear form allows a blank weight (stored as 0). An import
+// skips those rows instead of guessing a weight the spreadsheet left out.
 export function mapRowsToGearItems(rows: string[][], knownCategories: string[]): ImportResult {
   const valid: Omit<GearItem, 'id'>[] = [];
   const skipped: ImportSkip[] = [];
